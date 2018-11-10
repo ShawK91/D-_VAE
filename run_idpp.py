@@ -18,7 +18,6 @@ parser.add_argument('-savetag', help='Saved tag',  default='def')
 parser.add_argument('-gamma', type=float,  help='#Gamma',  default=0.97)
 parser.add_argument('-seed', type=float,  help='#Seed',  default=7)
 parser.add_argument('-dpp', type=str2bool,  help='#Use_DPP?',  default=True)
-parser.add_argument('-state_pert',  help='#State Perturbation type: Manual VS Random?',  default='manual')
 
 
 SEED = vars(parser.parse_args())['seed']
@@ -29,7 +28,7 @@ GAMMA = vars(parser.parse_args())['gamma']
 RENDER = vars(parser.parse_args())['render']
 DPP = vars(parser.parse_args())['dpp']
 CUDA = True
-STATE_PERT = vars(parser.parse_args())['state_pert']
+
 
 
 class Parameters:
@@ -52,9 +51,9 @@ class Parameters:
 
 
         #Rover domain
-        self.dim_x = self.dim_y = 20; self.obs_radius = 100; self.act_dist = 1.5; self.angle_res = 30
-        self.num_poi = 2; self.num_rover = 3; self.ep_len = 10
-        self.poi_rand = False; self.coupling = 3; self.rover_speed = 1
+        self.dim_x = self.dim_y = 15; self.obs_radius = 100; self.act_dist = 1.5; self.angle_res = 20
+        self.num_poi = 5; self.num_rover = 12; self.ep_len = 25
+        self.poi_rand = False; self.coupling = 5; self.rover_speed = 1
         self.render = RENDER
         self.is_homogeneous = False  #False --> Heterogenenous Actors
         self.sensor_model = 'closest'  #Closest VS Density
@@ -75,10 +74,10 @@ class Parameters:
         if not os.path.exists(self.model_save): os.makedirs(self.model_save)
         if not os.path.exists(self.aux_save): os.makedirs(self.aux_save)
 
-        self.critic_fname = 'critic_'+ 'dpp_' if DPP else '' + STATE_PERT + '_' +SAVE_TAG
-        self.actor_fname = 'actor_'+ 'dpp_' if DPP else ''+ STATE_PERT + '_' + SAVE_TAG
-        self.log_fname = 'reward_'+ 'dpp_' if DPP else ''+ STATE_PERT + '_' + SAVE_TAG
-        self.best_fname = 'best_'+'dpp_' if DPP else ''+ STATE_PERT + '_' + SAVE_TAG
+        self.critic_fname = 'critic_'+ 'dpp_' if DPP else '' + '_' +SAVE_TAG
+        self.actor_fname = 'actor_'+ 'dpp_' if DPP else ''+  '_' + SAVE_TAG
+        self.log_fname = 'reward_'+ 'dpp_' if DPP else ''+  '_' + SAVE_TAG
+        self.best_fname = 'best_'+'dpp_' if DPP else ''+ '_' + SAVE_TAG
 
         #Unit tests (Simply changes the rover/poi init locations)
         self.unit_test = 0 #0: None
@@ -160,33 +159,36 @@ class IDPP:
         ########### START TEST ROLLOUT ##########
         if self.test_eval_flag: #ALL DATA TEST
             self.test_eval_flag = False
-            self.test_task_pipe[0].send(True)
+            render = random.random() < 0.1
+            self.test_task_pipe[0].send(render)
 
 
         ########## START TRAIN (ACTION NOISE) ROLLOUTS ##########
         for i in range(NUM_WORKERS):
             if self.train_eval_flag[i]:
                 self.train_eval_flag[i] = False
-                self.task_pipes[i][0].send(True)
+                self.task_pipes[i][0].send(False)
 
-        # ############ POLICY GRADIENT #########
-        # if self.buffers[0].counter > 1000:
-        #     while self.update_budget > 0:
-        #
-        #
-        #         for buffer, agent in zip(self.buffers, self.agents):
-        #             s, ns, a, r, done = buffer.sample(self.args.batch_size)
-        #             if not MEM_CUDA and CUDA: s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
-        #
-        #             agent.update_parameters(s, ns, a, r, done, DPP, STATE_PERT, num_epoch=1)
-        #             self.update_budget -= 1
+        ############ POLICY GRADIENT #########
+        if self.buffers[0].counter > 1000:
+            while self.update_budget > 0:
+
+                for buffer, agent in zip(self.buffers, self.agents):
+                    s, ns, a, r, done = buffer.sample(self.args.batch_size)
+
+                    s = torch.Tensor(s); ns = torch.Tensor(ns); a = torch.Tensor(a); r = torch.Tensor(r); done = torch.Tensor(done)
+                    if not MEM_CUDA and CUDA: s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
+
+                    agent.update_parameters(s, ns, a, r, done, DPP, num_epoch=1)
+                    self.update_budget -= 1
 
 
         #Save models periodically
-        if gen % 100 == 0:
-            torch.save(self.agent.critic.state_dict(), self.args.model_save + self.args.critic_fname)
-            torch.save(self.agent.actor.state_dict(), self.args.model_save + self.args.actor_fname)
-            print("Critic Saved periodically")
+        if gen % 20 == 0:
+            for rover_id in range(self.args.num_rover):
+                torch.save(self.agents[rover_id].critic.state_dict(), self.args.model_save + self.args.critic_fname + '_'+ str(rover_id))
+                torch.save(self.agents[rover_id].actor.state_dict(), self.args.model_save + self.args.actor_fname + '_'+ str(rover_id))
+            print("Models Saved")
 
 
         ##### PROCESS TEST ROLLOUT ##########
@@ -245,8 +247,7 @@ if __name__ == "__main__":
         print('Ep:', gen, 'Score: cur/best:', pprint(ai.test_score), pprint(ai.best_score),
               'Time:',pprint(time.time()-gen_time),
               'Best_rollout_score', pprint(ai.best_rollout_score),
-              'DPP', DPP,
-              'State Perturbation', STATE_PERT)
+              'DPP', DPP)
 
 
 

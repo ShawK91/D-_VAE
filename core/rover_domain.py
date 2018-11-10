@@ -1,14 +1,15 @@
-import random
+import random, sys
 from random import randint
 import numpy as np
-import math, cPickle
+import math
 
 class Task_Rovers:
 
     def __init__(self, parameters):
         self.params = parameters; self.dim_x = parameters.dim_x; self.dim_y = parameters.dim_y
-        self.observation_space = np.zeros((2*360 / self.params.angle_res + 4, 1))
+        self.observation_space = np.zeros((int(2*360 / self.params.angle_res + 4), 1))
         self.action_space = np.zeros((self.params.action_dim,1))
+        self.ep_len = parameters.ep_len; self.istep = 0
 
         # Initialize food position container
         self.poi_pos = [[None, None] for _ in range(self.params.num_poi)]  # FORMAT: [item] = [x, y] coordinate
@@ -18,8 +19,6 @@ class Task_Rovers:
         self.rover_pos = [[0.0, 0.0] for _ in range(self.params.num_rover)]  # Track each rover's position
         self.ledger_closest = [[0.0, 0.0] for _ in range(self.params.num_rover)]  # Track each rover's ledger call
 
-        #Macro Action trackers
-        self.util_macro = [[False, False, False] for _ in range(self.params.num_rover)] #Macro utilities to track [Is_currently_active?, Is_activated_now?, Is_reached_destination?]
 
         #Rover path trace (viz)
         self.rover_path = [[(loc[0], loc[1])] for loc in self.rover_pos]
@@ -102,26 +101,20 @@ class Task_Rovers:
         self.reset_poi_pos()
         self.reset_rover_pos()
         self.poi_status = self.poi_status = [False for _ in range(self.params.num_poi)]
-        self.util_macro = [[False, False, False] for _ in range(self.params.num_rover)]  # Macro utilities to track [Is_currently_active?, Is_activated_now?, Is_reached_destination?]
         self.rover_path = [[(loc[0], loc[1])] for loc in self.rover_pos]
         self.action_seq = [[0.0 for _ in range(self.params.action_dim)] for _ in range(self.params.num_rover)]
+        self.istep = 0
         return self.get_joint_state()
 
     def get_joint_state(self):
         joint_state = []
         for rover_id in range(self.params.num_rover):
-            if self.util_macro[rover_id][0]: #If currently active
-                if self.util_macro[rover_id][1] == False: #Not first time activate (Not Is-activated-now)
-                    return np.zeros((720/self.params.angle_res + 5, 1)) -10000 #If macro return none
-                else:
-                    self.util_macro[rover_id][1] = False  # Turn off is_activated_now?
-
             self_x = self.rover_pos[rover_id][0]; self_y = self.rover_pos[rover_id][1]
 
-            rover_state = [0.0 for _ in range(360 / self.params.angle_res)]
-            poi_state = [0.0 for _ in range(360 / self.params.angle_res)]
-            temp_poi_dist_list = [[] for _ in range(360 / self.params.angle_res)]
-            temp_rover_dist_list = [[] for _ in range(360 / self.params.angle_res)]
+            rover_state = [0.0 for _ in range(int(360 / self.params.angle_res))]
+            poi_state = [0.0 for _ in range(int(360 / self.params.angle_res))]
+            temp_poi_dist_list = [[] for _ in range(int(360 / self.params.angle_res))]
+            temp_rover_dist_list = [[] for _ in range(int(360 / self.params.angle_res))]
 
             # Log all distance into brackets for POIs
             x2 = -1.0; y2 = 0.0
@@ -152,15 +145,17 @@ class Task_Rovers:
                 # POIs
                 num_poi = len(temp_poi_dist_list[bracket])
                 if num_poi > 0:
-                    if self.params.sensor_model == 1: poi_state[bracket] = sum(temp_poi_dist_list[bracket]) / num_poi #Density Sensor
-                    else: poi_state[bracket] = min(temp_poi_dist_list[bracket])  #Minimum Sensor
+                    if self.params.sensor_model == 'density': poi_state[bracket] = sum(temp_poi_dist_list[bracket]) / num_poi #Density Sensor
+                    elif self.params.sensor_model == 'closest': poi_state[bracket] = min(temp_poi_dist_list[bracket])  #Closest Sensor
+                    else: sys.exit('Incorrect sensor model')
                 else: poi_state[bracket] = -1.0
 
                 #Rovers
                 num_rover = len(temp_rover_dist_list[bracket])
                 if num_rover > 0:
-                    if self.params.sensor_model == 1: rover_state[bracket] = sum(temp_rover_dist_list[bracket]) / num_rover #Density Sensor
-                    else: rover_state[bracket] = min(temp_rover_dist_list[bracket]) #Minimum Sensor
+                    if self.params.sensor_model == 'density': rover_state[bracket] = sum(temp_rover_dist_list[bracket]) / num_rover #Density Sensor
+                    elif self.params.sensor_model == 'closest': rover_state[bracket] = min(temp_rover_dist_list[bracket]) #Closest Sensor
+                    else: sys.exit('Incorrect sensor model')
                 else: rover_state[bracket] = -1.0
 
             state = rover_state + poi_state #Append rover and poi to form the full state
@@ -185,9 +180,11 @@ class Task_Rovers:
         angle = angle % 360
         dist = x1 * x1 + y1 * y1
         dist = math.sqrt(dist)
+        if np.isnan(angle): angle = 0.0
         return angle, dist
 
     def step(self, joint_action):
+        self.istep += 1
 
         for rover_id in range(self.params.num_rover):
             action = joint_action[rover_id]
@@ -201,7 +198,10 @@ class Task_Rovers:
         for rover_id in range(self.params.num_rover):
             self.rover_path[rover_id].append((self.rover_pos[rover_id][0], self.rover_pos[rover_id][1]))
 
-        return self.get_joint_state(), self.get_reward()
+        #Compute done
+        done = int(self.istep >= self.ep_len)
+
+        return self.get_joint_state(), self.get_reward(), done, None
 
     def get_reward(self):
         #Update POI's visibility
@@ -244,7 +244,7 @@ class Task_Rovers:
             grid[x][y] = marker
 
         for row in grid:
-            print row
+            print(row)
         print
 
     def render(self):
@@ -254,7 +254,7 @@ class Task_Rovers:
         drone_symbol_bank = ["0", "1", '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']
         # Draw in rover path
         for rover_id in range(self.params.num_rover):
-            for time in range(self.params.num_timestep):
+            for time in range(self.ep_len):
                 x = int(self.rover_path[rover_id][time][0]);
                 y = int(self.rover_path[rover_id][time][1])
                 # print x,y
@@ -268,28 +268,10 @@ class Task_Rovers:
             grid[x][y] = marker
 
         for row in grid:
-            print row
-        print
+            print(row)
+        print()
 
-        print '------------------------------------------------------------------------'
+        print('------------------------------------------------------------------------')
 
 
-
-#Functions
-def unpickle(filename):
-    import pickle
-    with open(filename, 'rb') as handle:
-        b = pickle.load(handle)
-    return b
-
-def pickle_object(obj, filename):
-    with open(filename, 'wb') as output:
-        cPickle.dump(obj, output, -1)
-
-def unsqueeze(array, axis=1):
-    if axis == 0: return np.reshape(array, (1, len(array)))
-    elif axis == 1: return np.reshape(array, (len(array), 1))
-
-def to_numpy(var):
-    return var.cpu().data.numpy()
 

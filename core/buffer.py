@@ -1,4 +1,4 @@
-import random, torch
+import random, numpy as np
 
 
 class Buffer():
@@ -57,7 +57,7 @@ class Buffer():
                    Experience (tuple): A tuple of (state, next_state, action, shaped_reward, done) each as a numpy array with shape (batch_size, :)
            """
         ind = random.sample(range(self.__len__()), batch_size)
-        return torch.cat([self.s[i] for i in ind]), torch.cat([self.ns[i] for i in ind]), torch.cat([self.a[i] for i in ind]), torch.cat([self.r[i] for i in ind]), torch.cat([self.done[i] for i in ind])
+        return np.vstack([self.s[i] for i in ind]), np.vstack([self.ns[i] for i in ind]), np.vstack([self.a[i] for i in ind]), np.vstack([self.r[i] for i in ind]), np.vstack([self.done[i] for i in ind])
 
 
 

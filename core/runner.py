@@ -28,7 +28,7 @@ def rollout_worker(args, worker_id, task_pipe, result_pipe, noise, data_bucket, 
 
 
     while True:
-        _ = task_pipe.recv() #Wait until a signal is received  to start rollout
+        RENDER = task_pipe.recv() #Wait until a signal is received  to start rollout
 
         # Get the current model state from the population
         for m, bucket_model in zip(models, models_bucket):
@@ -52,14 +52,15 @@ def rollout_worker(args, worker_id, task_pipe, result_pipe, noise, data_bucket, 
 
             #If storing transitions
             for i in range(args.num_rover):
-                rollout_trajectory[i].append([joint_state[i,:].unsqueeze(0), torch.Tensor(joint_action[i]).unsqueeze(0),
-                                              next_state[i,:].unsqueeze(0), torch.Tensor([reward[i]]).unsqueeze(0),
-                                              torch.Tensor([done]).unsqueeze(0)])
+                rollout_trajectory[i].append([np.expand_dims(utils.to_numpy(joint_state)[i,:], 0), np.expand_dims(np.array(joint_action)[i,:], 0),
+                                              np.expand_dims(utils.to_numpy(next_state)[i, :], 0), np.expand_dims(np.array([reward[i]]), 0),
+                                              np.expand_dims(np.array([done]), 0)])
 
             joint_state = next_state
 
             #DONE FLAG IS Received
             if done:
+                if RENDER: env.render()
                 #Push experiences to main
                 for rover_id in range(args.num_rover):
                     for entry in rollout_trajectory[rover_id]:

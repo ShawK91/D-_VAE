@@ -19,7 +19,7 @@ class Critic(nn.Module):
     def __init__(self, args):
         super(Critic, self).__init__()
         self.args = args
-        l1 = 400; l2 = 400; l3 = 300
+        l1 = 100; l2 = 80; l3 = 300
 
         # Construct Hidden Layer 1 with state
         self.f1_state = nn.Linear(args.state_dim, l1)
@@ -152,13 +152,13 @@ class TD3(object):
         self.actor = Actor(args)
         self.actor.apply(utils.init_weights)
         self.actor_target = Actor(args)
-        self.actor_optim = Adam(self.actor.parameters(), lr=5e-5)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
 
 
         self.critic = Critic(args)
         self.critic.apply(utils.init_weights)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=5e-4)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
 
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.MSELoss()
@@ -192,7 +192,7 @@ class TD3(object):
         tracker['mean'].append(torch.mean(tensor).item())
         tracker['mean'].append(torch.mean(tensor).item())
 
-    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, done_batch, dpp, state_perturbation, num_epoch=1):
+    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, done_batch, dpp, num_epoch=1):
         """Runs a step of Bellman upodate and policy gradient using a batch of experiences
 
              Parameters:
@@ -258,7 +258,7 @@ class TD3(object):
                 actor_actions = self.actor.forward(state_batch)
 
                 if dpp:
-                    policy_loss = -self.shape_dpp(self.critic, self.actor, state_batch, state_perturbation, self.args.sensor_model)
+                    policy_loss = -self.shape_dpp(self.critic, self.actor, state_batch, self.args.sensor_model)
 
                 else:
                     Q1, Q2, val = self.critic.forward(state_batch, actor_actions)
@@ -318,7 +318,7 @@ class TD3(object):
 
 
 
-    def shape_dpp(self, critic, actor, state, state_perturbation, sensor_model):
+    def shape_dpp(self, critic, actor, state, sensor_model):
 
         Q1, _, val = critic((state),actor((state)))
         original_T = Q1 - val
@@ -326,7 +326,7 @@ class TD3(object):
         all_adv = [original_T]
 
         state = utils.to_numpy(state.cpu())
-        mid_index = int(180 / self.args.angle_res)
+        #mid_index = int(180 / self.args.angle_res)
         coupling = self.args.coupling
 
         max_ind = int(360 / self.args.angle_res)
