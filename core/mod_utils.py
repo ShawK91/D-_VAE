@@ -15,12 +15,13 @@ class Tracker(): #Tracker
         None
     """
 
-    def __init__(self, save_folder, vars_string, project_string):
+    def __init__(self, save_folder, vars_string, project_string, save_iteration=1, conv_size=1):
         self.vars_string = vars_string; self.project_string = project_string
         self.foldername = save_folder
         self.all_tracker = [[[],0.0,[]] for _ in vars_string] #[Id of var tracked][fitnesses, avg_fitness, csv_fitnesses]
         self.counter = 0
-        self.conv_size = 10
+        self.conv_size = conv_size
+        self.save_iteration = save_iteration
         if not os.path.exists(self.foldername):
             os.makedirs(self.foldername)
 
@@ -50,12 +51,32 @@ class Tracker(): #Tracker
             if len(var[0]) == 0: continue
             var[1] = sum(var[0])/float(len(var[0]))
 
-        if self.counter % 4 == 0:  # Save to csv file
+        if self.counter % self.save_iteration == 0:  # Save to csv file
             for i, var in enumerate(self.all_tracker):
                 if len(var[0]) == 0: continue
                 var[2].append(np.array([generation, var[1]]))
                 filename = self.foldername + self.vars_string[i] + self.project_string
                 np.savetxt(filename, np.array(var[2]), fmt='%.3f', delimiter=',')
+
+
+
+def compute_stats(tensor, tracker):
+    """Computes stats from intermediate tensors
+
+         Parameters:
+               tensor (tensor): tensor
+               tracker (object): logger
+
+         Returns:
+               None
+
+
+     """
+    tracker['min'] = torch.min(tensor).item()
+    tracker['max'] = torch.max(tensor).item()
+    tracker['mean'] = torch.mean(tensor).item()
+    tracker['std'] = torch.std(tensor).item()
+
 
 
 def str2bool(v):
@@ -65,6 +86,44 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def hard_update(target, source):
+    """Hard update (clone) from target network to source
+
+        Parameters:
+              target (object): A pytorch model
+              source (object): A pytorch model
+
+        Returns:
+            None
+    """
+
+    for target_param, param in zip(target.parameters(), source.parameters()):
+        target_param.data.copy_(param.data)
+
+    #Signature transfer if applicable
+    try:
+        target.wwid[0] = source.wwid[0]
+    except:
+	    None
+
+
+def soft_update(target, source, tau):
+    """Soft update from target network to source
+
+        Parameters:
+              target (object): A pytorch model
+              source (object): A pytorch model
+              tau (float): Tau parameter
+
+        Returns:
+            None
+
+    """
+
+    for target_param, param in zip(target.parameters(), source.parameters()):
+        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 
 def to_numpy(var):
@@ -157,71 +216,31 @@ def pprint(l):
 
     if isinstance(l, list):
         if len(l) == 0: return None
+        else: ['%.2f'%item for item in l]
+    elif isinstance(l, dict):
+        return l
+    elif isinstance(l, tuple):
+        return ['%.2f'%item for item in l]
     else:
         if l == None: return None
         else: return '%.2f'%l
 
-def hard_update(target, source):
-    """Hard update (clone) from target network to source
 
-        Parameters:
-              target (object): A pytorch model
-              source (object): A pytorch model
+def list_stat(l):
+    """compute avergae from a list
 
-        Returns:
-            None
+    Parameters:
+        l (list): list
+
+    Returns:
+        mean (float): mean
     """
-    for target_param, param in zip(target.parameters(), source.parameters()):
-        target_param.data.copy_(param.data)
+    if len(l) == 0: return None
+    else:
+        arr = np.array(l)
+        return '%.2f'%np.min(arr), '%.2f'%np.max(arr), '%.2f'%np.mean(arr), '%.2f'%np.std(arr)
 
-# def process_dict(state_desc):
-#
-#     # Augmented environment from the L2R challenge
-#     res = []
-#     pelvis = None
-#
-#     for body_part in ["pelvis", "head", "torso", "toes_l", "toes_r", "talus_l", "talus_r"]:
-#         if body_part in ["toes_r", "talus_r"]:
-#             res += [0] * 9
-#             continue
-#         cur = []
-#         cur += state_desc["body_pos"][body_part][0:2]
-#         cur += state_desc["body_vel"][body_part][0:2]
-#         cur += state_desc["body_acc"][body_part][0:2]
-#         cur += state_desc["body_pos_rot"][body_part][2:]
-#         cur += state_desc["body_vel_rot"][body_part][2:]
-#         cur += state_desc["body_acc_rot"][body_part][2:]
-#         if body_part == "pelvis":
-#             pelvis = cur
-#             res += cur[1:]
-#         else:
-#             cur_upd = cur
-#             cur_upd[:2] = [cur[i] - pelvis[i] for i in range(2)]
-#             cur_upd[6:7] = [cur[i] - pelvis[i] for i in range(6, 7)]
-#             res += cur
-#
-#     for joint in ["ankle_l", "ankle_r", "back", "hip_l", "hip_r", "knee_l", "knee_r"]:
-#         res += state_desc["joint_pos"][joint]
-#         res += state_desc["joint_vel"][joint]
-#         res += state_desc["joint_acc"][joint]
-#
-#     for muscle in sorted(state_desc["muscles"].keys()):
-#         res += [state_desc["muscles"][muscle]["activation"]]
-#         res += [state_desc["muscles"][muscle]["fiber_length"]]
-#         res += [state_desc["muscles"][muscle]["fiber_velocity"]]
-#
-#     cm_pos = [state_desc["misc"]["mass_center_pos"][i] - pelvis[i] for i in range(2)]
-#     res = res + cm_pos + state_desc["misc"]["mass_center_vel"] + state_desc["misc"]["mass_center_acc"]
-#
-#     return res
 
-# Disable
-# def blockPrint():
-#     sys.stdout = open(os.devnull, 'w')
-#
-# # Restore
-# def enablePrint():
-#     sys.stdout = sys.__stdout__
 
 def flatten(d):
     """Recursive method to flatten a dict -->list
@@ -293,93 +312,6 @@ def load_all_models_dir(dir, model_template):
     return models
 
 
-
-# def reverse_flatten(template, l):
-#     print (len(l))
-#     if isinstance(template, dict):
-#         for key1, val1 in sorted(template.items()):
-#
-#             ########## LEVEL 2 ############
-#             if isinstance(val1, dict):
-#                 for key2, val2 in sorted(val1.items()):
-#
-#                     ########## LEVEL 3 ############
-#                     if isinstance(val2, dict):
-#                         for key3, val3 in sorted(val2.items()):
-#
-#                             ########## LEVEL 4 ############
-#                             if isinstance(val3, dict):
-#                                 for key4, val4 in sorted(val3.items()):
-#
-#                                     ########## LEVEL 5 ############
-#                                     if isinstance(val4, dict):
-#                                         for key5, val5 in sorted(val4.items()):
-#
-#                                             if isinstance(val5, list) and len(val5) != 0:
-#                                                 template[key1][key2][key3][key4][key5] = l[0:len(val5)]
-#                                                 l = l[len(val5):]
-#
-#
-#                                             elif isinstance(val5, float):
-#                                                 template[key1][key2][key3][key4][key5] = val5
-#                                                 l = l[1:]
-#
-#                                             else: print(val5)
-#
-#                                     ########## LEVEL 5 ENDS ############
-#
-#                                     elif isinstance(val4, list) and len(val4) != 0:
-#                                         template[key1][key2][key3][key4] = l[0:len(val4)]
-#                                         l = l[len(val4):]
-#
-#
-#                                     elif isinstance(val4, float):
-#                                         template[key1][key2][key3][key4] = val4
-#                                         l = l[1:]
-#
-#                                     else: print(val4)
-#
-#                             ########## LEVEL 4 ENDS ############
-#
-#                             elif isinstance(val3, list) and len(val3) != 0:
-#                                 template[key1][key2][key3] = l[0:len(val3)]
-#                                 l = l[len(val3):]
-#
-#
-#                             elif isinstance(val3, float):
-#                                 template[key1][key2][key3] = val3
-#                                 l = l[1:]
-#
-#                             else: print(val3)
-#
-#                     ########## LEVEL 3 ENDS ############
-#
-#                     elif isinstance(val2, list)and len(val2) != 0:
-#                         template[key1][key2] = l[0:len(val2)]
-#                         l = l[len(val2):]
-#
-#
-#                     elif isinstance(val2, float):
-#                         template[key1][key2] = val2
-#                         l = l[1:]
-#
-#                     else: print(val2)
-#
-#              ########## LEVEL 2 ENDS ############
-#
-#             elif isinstance(val1, list) and len(val1) != 0:
-#                 template[key1] = l[0:len(val1)]
-#                 l = l[len(val1):]
-#
-#             elif isinstance(val1, float):
-#                 template[key1] = val1
-#                 l = l[1:]
-#
-#             else: print(val1)
-#
-#
-#
-#     return template
 
 
 
