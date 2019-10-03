@@ -26,11 +26,7 @@ def rollout_worker(args, id, type, task_pipe, result_pipe, data_bucket, models_b
     elif type == 'evo': NUM_EVALS = 10 if not args.config.env_choice == 'motivate' else 1
     else: sys.exit('Incorrect type')
 
-    if args.config.env_choice == 'multiwalker': NUM_EVALS=1
-    if args.config.env_choice == 'cassie': NUM_EVALS = 1
-    if args.config.env_choice == 'hyper': NUM_EVALS = 1
-    if args.config.env_choice == 'pursuit': NUM_EVALS = 10
-    if args.config.env_choice == 'maddpg_envs': NUM_EVALS = 10
+
 
 
 
@@ -38,24 +34,9 @@ def rollout_worker(args, id, type, task_pipe, result_pipe, data_bucket, models_b
     if args.config.env_choice == 'rover_tight' or args.config.env_choice == 'rover_loose' or args.config.env_choice == 'rover_trap':
         from envs.env_wrapper import RoverDomainPython
         env = RoverDomainPython(args, NUM_EVALS)
-    elif args.config.env_choice == 'motivate':
-        from envs.env_wrapper import MotivateDomain
-        env = MotivateDomain(args, NUM_EVALS)
-    elif args.config.env_choice == 'pursuit':
-        from envs.env_wrapper import Pursuit
-        env = Pursuit(args, NUM_EVALS)
-    elif args.config.env_choice == 'multiwalker':
-        from envs.env_wrapper import MultiWalker
-        env = MultiWalker(args, NUM_EVALS)
-    elif args.config.env_choice == 'cassie':
-        from envs.env_wrapper import Cassie
-        env = Cassie(args, NUM_EVALS)
-    elif args.config.env_choice == 'hyper':
-        from envs.env_wrapper import PowerPlant
-        env = PowerPlant(args, NUM_EVALS)
-    elif args.config.env_choice == 'maddpg_envs':
-        from envs.env_wrapper import SimpleSpread
-        env = SimpleSpread(args, NUM_EVALS)
+    elif args.config.env_choice == 'rover_heterogeneous':
+        from envs.env_wrapper import RoverHeterogeneous
+        env = RoverHeterogeneous(args, NUM_EVALS)
     else: sys.exit('Incorrect env type')
     np.random.seed(id); random.seed(id)
 

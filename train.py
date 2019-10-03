@@ -12,15 +12,15 @@ import threading, sys
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-popsize', type=int, help='#Evo Population size', default=0)
+parser.add_argument('-popsize', type=int, help='#Evo Population size', default=10)
 parser.add_argument('-rollsize', type=int, help='#Rollout size for agents', default=10)
-parser.add_argument('-env', type=str, help='Env to test on?', default='rover_tight')
+parser.add_argument('-env', type=str, help='Env to test on?', default='rover_heterogeneous')
 parser.add_argument('-config', type=str, help='World Setting?', default='10_5')
 parser.add_argument('-matd3', type=str2bool, help='Use_MATD3?', default=False)
 parser.add_argument('-maddpg', type=str2bool, help='Use_MADDPG?', default=False)
 parser.add_argument('-reward', type=str, help='Reward Structure? 1. mixed 2. global', default='global')
 parser.add_argument('-frames', type=float, help='Frames in millions?', default=20)
-parser.add_argument('-dpp', type=str2bool, help='Use DPP?', default=True)
+parser.add_argument('-dpp', type=str2bool, help='Use DPP?', default=False)
 
 
 
@@ -185,64 +185,8 @@ class ConfigSettings:
 			if self.env_choice == "rover_loose": self.coupling = 1 #Definiton of a Loosely coupled domain
 
 
-		elif self.env_choice == 'motivate':  # Rover Domain
-			# Motivate domain
-			self.dim_x = self.dim_y = 20
-			self.obs_radius = self.dim_x * 10
-			self.act_dist = 2
-			self.angle_res = 10
-			self.num_poi = 2
-			self.num_agents = 2
-			self.ep_len = 30
-			self.poi_rand = 0
-			self.coupling = 1
-			self.rover_speed = 1
-			self.sensor_model = 'closest'
-			self.harvest_period = 1
-
-		elif self.env_choice == 'pursuit':  # Rover Domain
-			#Pursuit Domain
-			if config == '2_2':
-				self.num_agents = 2
-				self.coupling = 2
-
-			elif config == '1_1':
-				self.num_agents = 1
-				self.coupling = 1
-
-			elif config == '3_3':
-				self.num_agents = 3
-				self.coupling = 3
-			elif config == '4_4':
-				self.num_agents = 4
-				self.coupling = 4
-			else:
-				sys.exit('Unknown Config')
-
-
-
-		# MultiWalker Domain
-		elif self.env_choice == 'multiwalker':  # MultiWalker Domain
-			try:
-				self.num_agents = int(config)
-			except:
-				sys.exit('Unknown Config Choice for multiwalker env. Choose #walkers')
-
-		# Cassie Domain
-		elif self.env_choice == 'cassie':  # Cassie Domain
-			self.num_agents = 1
-
-		# Hyper Domain
-		elif self.env_choice == 'hyper':  # Hyper Domain
-			self.num_agents = 1
-			self.target_sensor = 11
-			self.run_time = 300
-			self.sensor_noise = 0.1
-			self.reconf_shape = 2
-			self.num_profiles = 3 #only applicable for some reconf_shapes
-
-		elif self.env_choice == 'maddpg_envs':  # Hyper Domain
-			self.num_agents = 3
+		elif self.env_choice == 'rover_heterogeneous':
+			pass
 
 
 		else:
