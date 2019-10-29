@@ -48,7 +48,7 @@ class MultiHeadActor(nn.Module):
 
 
 		"""
-
+		#state = state.view(state.size(0), -1)
 		x = torch.tanh(self.linear1(state))
 		x = torch.tanh(self.linear2(x))
 		mean = torch.tanh(self.mean(x))
@@ -63,6 +63,7 @@ class MultiHeadActor(nn.Module):
 
 	def noisy_action(self, state, head=-1):
 
+		#state = state.view(state.size(0), -1)
 		x = torch.tanh(self.linear1(state))
 		x = torch.tanh(self.linear2(x))
 		mean = torch.tanh(self.mean(x))

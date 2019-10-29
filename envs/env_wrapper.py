@@ -140,10 +140,20 @@ class RoverHeterogeneous:
 		joint_obs = []; joint_reward = []; joint_done = []; joint_global = []
 		for universe_id, env in enumerate(self.universe):
 			next_state, reward, done, info = env.step(action[:,universe_id,:])
+
+
 			joint_obs.append(next_state); joint_reward.append(reward); joint_done.append(done); joint_global.append(info)
 
-		joint_obs = np.stack(joint_obs, axis=1)
+			#if(len(next_state[0])!=111 or len(next_state[1])!=111 or len(next_state[2])!=111 or len(next_state[3])!=111):
+			#	print("NO...................", len(next_state[0]), len(next_state[1]), len(next_state[2]), len(next_state[3]))
+				#next_state, reward, done, info = env.step(action[:, universe_id, :])
+
+		try: joint_obs = np.stack(joint_obs, axis=1)
+		except:
+			print("Not happening", (len(joint_obs), len(joint_obs[0])))
+
 		joint_reward = np.stack(joint_reward, axis=1)
+
 
 		return joint_obs, joint_reward, joint_done, joint_global
 

@@ -76,9 +76,9 @@ class Agent:
 
 		#Initalize buffer
 		if args.ps == 'trunk':
-			self.buffer = [Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c) for _ in range(args.config.num_agents)]
+			self.buffer = [Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c) for _ in range(args.config.num_agents)] # buffer is different for each agent
 		else:
-			self.buffer = Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c)
+			self.buffer = Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c) # corresponding to individual agent
 
 		#Agent metrics
 		self.fitnesses = [[] for _ in range(args.popn_size)]
@@ -169,6 +169,7 @@ class Agent:
 
 	def update_rollout_actor(self):
 		for actor in self.rollout_actor:
+			#print(self.rollout_actor)
 			self.algo.policy.cpu()
 			mod.hard_update(actor, self.algo.policy)
 			if self.args.use_gpu: self.algo.policy.cuda()
