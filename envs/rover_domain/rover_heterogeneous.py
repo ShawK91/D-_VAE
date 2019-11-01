@@ -75,26 +75,33 @@ class RoverDomainHeterogeneous:
 
 		self.istep += 1
 
-		# todo: different action space for both rovers and POIs
-		if self.args.action_space == "different":
-			for rover_id in range(self.args.num_agents):
-				rover_type = int(rover_id / self.args.num_agents_per_type)
-				if rover_type == 0: # uav
-					joint_action[rover_id] = joint_action[rover_id]*2 # increase the speed of UAV
-
 
 		joint_action = joint_action.clip(-1.0, 1.0)
 
 
 		for rover_id in range(self.args.num_agents):
 
+
+
+			# todo: different action space for both rovers and POIs
+			if self.args.action_space == "different":
+				rover_type = int(rover_id / self.args.num_agents_per_type)
+				if rover_type == 0:  # uav
+					multiplier = 1.5
+				else:
+					multiplier = 1.0
+
+
 			magnitude = 0.5*(joint_action[rover_id][0]+1) # [-1,1] --> [0,1]
-			self.rover_vel[rover_id][0] += magnitude
+			self.rover_vel[rover_id][0] += multiplier * magnitude
 
 			joint_action[rover_id][1] /= 2.0 #Theta (bearing constrained to be within 90 degree turn from heading)
 			self.rover_vel[rover_id][1] += joint_action[rover_id][1]
 
 			#Constrain
+
+
+
 			if self.rover_vel[rover_id][0] < 0: self.rover_vel[rover_id][0] = 0.0
 			elif self.rover_vel[rover_id][0] > 1: self.rover_vel[rover_id][0] = 1.0
 
@@ -205,6 +212,7 @@ class RoverDomainHeterogeneous:
 
 				angle, dist = self.get_angle_dist(self_x, self_y, loc[0], loc[1])
 
+
 				## todo: this is added for long_range_lidar of truck
 				if self.args.config == 'fire_truck_uav_long_range_lidar':
 					try: bracket = int(angle / self.args.angle_res)
@@ -218,6 +226,10 @@ class RoverDomainHeterogeneous:
 
 				else:
 					if dist > self.args.obs_radius[rover_type_ref]: continue  # Observability radius
+
+
+
+				#if dist > self.args.obs_radius[rover_type_ref]: continue
 
 				angle -= self_orient
 				if angle < 0: angle += 360
@@ -256,6 +268,9 @@ class RoverDomainHeterogeneous:
 
 				else:
 					if dist > self.args.obs_radius[rover_type_ref]: continue #Observability radius of ref_type rover, as we are taking its range POIs and rovers
+				
+
+				#if dist > self.args.obs_radius[rover_type_ref]: continue
 
 				if dist == 0: dist = 0.001
 				try: bracket = int(angle / self.args.angle_res)
@@ -332,7 +347,7 @@ class RoverDomainHeterogeneous:
 		return angle, dist
 
 
-	def get_local_reward(self):
+	def get_local_reward(self): # this is at each time step
 		#Update POI's visibility
 
 		poi_visitors = [[[] for _ in range(self.args.num_agent_types)] for _ in range(self.args.num_poi)]
@@ -342,7 +357,7 @@ class RoverDomainHeterogeneous:
 		# poi_visitor_dist = np.zeros((self.args.num_poi, self.args.num_agent_types)) # fixme: changed [[] for _ in range(self.args.num_poi)]
 
 		for i, loc in enumerate(self.poi_pos): #For all POIs
-			if self.poi_status[i]== 0:
+			if self.poi_status[i]== 0: # if it has been observed
 				continue #Ignore POIs that have been harvested already
 
 			for rover_id in range(self.args.num_agents): #For each rover (num_agents is the total number of agents)
@@ -378,6 +393,10 @@ class RoverDomainHeterogeneous:
 
 				if self.task_type == 'rover_heterogeneous' and coupling_satisfied:
 					self.poi_status[poi_id] -= 1 # if coupling is fulfilled, make it 0 from 1
+
+					if (self.poi_status[poi_id]<0):
+						print("OHH THERE IS A BUG")
+
 					temp_list =  [item for sublist in rovers for item in sublist] # coverting list of list to a list
 					self.poi_visitor_list[poi_id] = list(set(self.poi_visitor_list[poi_id]+temp_list)) # add the number corresponding to each agent
 
@@ -390,8 +409,11 @@ class RoverDomainHeterogeneous:
 			for i in range(self.args.num_agents):
 				#print("%%%%%%%%%", self.rover_closest_poi)
 
-
-				proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # no reward shaping, both UAVs and fire trucks needs to go to POI
+				agent_type = int(i / self.args.num_agents_per_type)
+				if (self.rover_closest_poi[i]  > self.args.obs_radius[agent_type]): # if the closest distance to POI is outside the obs radius, do nothing
+					continue
+				else:
+					proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # no reward shaping, both UAVs and fire trucks needs to go to POI
 
 				#### fixme: below code is just an experiment with some shaped reward
 
