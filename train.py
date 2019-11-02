@@ -10,10 +10,12 @@ import random
 import threading, sys
 
 parser = argparse.ArgumentParser()
+
 parser.add_argument('-popsize', type=int, help='#Evo Population size', default=10)
 parser.add_argument('-rollsize', type=int, help='#Rollout size for agents', default=50)
 parser.add_argument('-env', type=str, help='Env to test on?', default='rover_heterogeneous')
 parser.add_argument('-config', type=str, help='World Setting?', default='fire_truck_uav_long_range_lidar') # todo: change this for different coupling requirements
+
 parser.add_argument('-matd3', type=str2bool, help='Use_MATD3?', default=False)
 parser.add_argument('-maddpg', type=str2bool, help='Use_MADDPG?', default=False)
 parser.add_argument('-reward', type=str, help='Reward Structure? 1. mixed 2. global', default='global')

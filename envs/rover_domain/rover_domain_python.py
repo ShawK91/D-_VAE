@@ -242,6 +242,7 @@ class RoverDomainVel:
 
 			state = rover_state + [rover_id] +  poi_state + self.rover_vel[rover_id] #Append rover_id, rover LIDAR and poi LIDAR to form the full state
 
+
 			# #Append wall info
 			# state = state + [-1.0, -1.0, -1.0, -1.0]
 			# if self_x <= self.args.obs_radius: state[-4] = self_x
