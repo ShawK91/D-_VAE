@@ -21,7 +21,7 @@ parser.add_argument('-maddpg', type=str2bool, help='Use_MADDPG?', default=False)
 parser.add_argument('-reward', type=str, help='Reward Structure? 1. mixed 2. global', default='global')
 parser.add_argument('-frames', type=float, help='Frames in millions?', default=20)
 parser.add_argument('-dpp', type=str2bool, help='Use DPP?', default=False)
-parser.add_argument('-action_space', type=str, help='different or same?', default='different') # todo: for different speeds of each agents
+parser.add_argument('-action_space', type=str, help='different or same?', default='same') # todo: for different speeds of each agents
 
 parser.add_argument('-filter_c', type=int, help='Prob multiplier for evo experiences absorbtion into buffer?', default=1)
 parser.add_argument('-evals', type=int, help='#Evals to compute a fitness', default=1)
