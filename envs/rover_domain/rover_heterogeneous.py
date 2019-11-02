@@ -82,15 +82,13 @@ class RoverDomainHeterogeneous:
 		for rover_id in range(self.args.num_agents):
 
 
-
+			multiplier = 1.0
 			# todo: different action space for both rovers and POIs
 			if self.args.action_space == "different":
 				rover_type = int(rover_id / self.args.num_agents_per_type)
 				if rover_type == 0:  # uav
 					multiplier = 1.5
-				else:
-					multiplier = 1.0
-
+				
 
 			magnitude = 0.5*(joint_action[rover_id][0]+1) # [-1,1] --> [0,1]
 			self.rover_vel[rover_id][0] += multiplier * magnitude
