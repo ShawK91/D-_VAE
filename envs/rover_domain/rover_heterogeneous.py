@@ -81,14 +81,13 @@ class RoverDomainHeterogeneous:
 
 		for rover_id in range(self.args.num_agents):
 
-
 			multiplier = 1.0
 			# todo: different action space for both rovers and POIs
 			if self.args.action_space == "different":
 				rover_type = int(rover_id / self.args.num_agents_per_type)
 				if rover_type == 0:  # uav
 					multiplier = 1.5
-				
+
 
 			magnitude = 0.5*(joint_action[rover_id][0]+1) # [-1,1] --> [0,1]
 			self.rover_vel[rover_id][0] += multiplier * magnitude
@@ -252,7 +251,7 @@ class RoverDomainHeterogeneous:
 				angle -= self_orient
 				if angle < 0: angle += 360
 
-
+				#### consider only those rovers which are inside the observation radius
 				## todo: this is added for long_range_lidar of truck
 				if self.args.config == 'fire_truck_uav_long_range_lidar':
 					try: bracket = int(angle / self.args.angle_res)
@@ -286,6 +285,8 @@ class RoverDomainHeterogeneous:
 
 
 				#update closest POI for each rover info #todo: added just for fire truck and UAV case
+
+				##### UAV keeps distance to closest trucks and trucks keeps distance to closest UAVs
 				if(rover_type_ref == 0 and rover_type != rover_type_ref): # UAV case, and distance of UAVs to trucks
 					if dist < self.rover_closest_rover[rover_id]: self.rover_closest_rover[rover_id] = dist
 
@@ -408,26 +409,53 @@ class RoverDomainHeterogeneous:
 				#print("%%%%%%%%%", self.rover_closest_poi)
 
 				agent_type = int(i / self.args.num_agents_per_type)
+
+				##### fixme: for both UAV and truck, local reward is being close to POI
+				'''
 				if (self.rover_closest_poi[i]  > self.args.obs_radius[agent_type]): # if the closest distance to POI is outside the obs radius, do nothing
 					continue
 				else:
-					proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # no reward shaping, both UAVs and fire trucks needs to go to POI
-
-				#### fixme: below code is just an experiment with some shaped reward
-
-				'''
-				if (i // self.args.num_agents_per_type == 1): # truck
-					proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # reward will be in according to distance from POI
-				else:                                          # UAV
-					proxim_rew = 0.2*self.args.act_dist / self.rover_closest_poi[i] + 0.8*self.args.act_dist / self.rover_closest_rover[i] # reward will be in according to distance from POI as well as distance to UAV
+					proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # both UAVs and fire trucks needs to go to POI, although the coupling requirement does not need UAV to go to them
 				'''
 
+				
+				#### local reward for truck being close to UAV and for UAV being close to POI
+				if (agent_type == 1):  # truck
+					if (self.rover_closest_rover[i] > self.args.obs_radius[agent_type]): # if it is outside the obs radius
+						continue
+					else: # reward will be in according to distance from UAV
+						proxim_rew = self.args.act_dist / self.rover_closest_rover[i]
+				else:  # UAV
+					if (self.rover_closest_poi[i] > self.args.obs_radius[agent_type]):   # if it is outside the obs radius
+						continue
+					else: # reward will be in according to distance from POI as well as distance to UAV
+						proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # fixme: this self.args.act_dist should not be there
+
+				#### local reward for truck being close to UAV and also being close to closest POI and for UAV being close to POI
 				'''
-				if (i // self.args.num_agents_per_type == 0): # UAV
-					proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # closest to POI
-				else:                                          # truck
-					proxim_rew = self.args.act_dist / self.rover_closest_rover[i] # closest to uav
+				if (agent_type == 1):  # truck
+					if (self.rover_closest_rover[i] > self.args.obs_radius[agent_type] and self.rover_closest_poi[i] > self.args.obs_radius[agent_type]): # if both are outside the obs radius
+						continue
+					else:
+						proxim_rew_uav = 0.0
+						proxim_rew_poi = 0.0
+						
+						if(self.rover_closest_rover[i] <= self.args.obs_radius[agent_type]): # if UAV is within obs radius
+							proxim_rew_uav = self.args.act_dist / self.rover_closest_rover[i]
+							
+						if (self.rover_closest_poi[i] <= self.args.obs_radius[agent_type]): # if POI is within obs radius
+							proxim_rew_poi = self.args.act_dist / self.rover_closest_poi[i]
+					
+					proxim_rew = 0.2*proxim_rew_uav + 0.8*proxim_rew_poi # change this 
+					
+				else:  # UAV
+					if (self.rover_closest_poi[i] > self.args.obs_radius[agent_type]):   # if it is outside the obs radius
+						continue
+					else: # reward will be in according to distance from POI as well as distance to UAV
+						proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # fixme: this self.args.act_dist should not be there
+
 				'''
+
 
 				if proxim_rew > 1.0: proxim_rew = 1.0
 				rewards[i] += proxim_rew
