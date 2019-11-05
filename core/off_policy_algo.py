@@ -615,11 +615,11 @@ class MultiTD3(object):
 			for coupling_mag in range(coupling):
 				for row_id in range(len(state)):
 					random_entry = random.randint(0, max_ind)
-					state[row_id, random_entry] = 10.0
+					state[row_id, random_entry] = 0.5
 
-			shaped_state = utils.to_tensor(state).cuda()
-			Q1, Q2 = critic.forward(shaped_state, action)
-			all_Q.append(torch.min(Q1,Q2)/(coupling_mag+1.0))
+				shaped_state = utils.to_tensor(state).cuda()
+				Q1, Q2 = critic.forward(shaped_state, action)
+				all_Q.append(torch.min(Q1,Q2)/(coupling_mag+1.0))
 
 			all_Q = torch.cat(all_Q, 1)
 			all_qvals = all_Q.cpu().data.numpy()

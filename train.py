@@ -9,24 +9,21 @@ import argparse
 import random
 import threading, sys
 
-
-
 parser = argparse.ArgumentParser()
-parser.add_argument('-popsize', type=int, help='#Evo Population size', default=0)
-parser.add_argument('-rollsize', type=int, help='#Rollout size for agents', default=10)
-parser.add_argument('-env', type=str, help='Env to test on?', default='rover_tight')
-parser.add_argument('-config', type=str, help='World Setting?', default='10_5')
+parser.add_argument('-popsize', type=int, help='#Evo Population size', default=10)
+parser.add_argument('-rollsize', type=int, help='#Rollout size for agents', default=50)
+parser.add_argument('-env', type=str, help='Env to test on?', default='rover_heterogeneous')
+parser.add_argument('-config', type=str, help='World Setting?', default='fire_truck_uav_long_range_lidar') # todo: change this for different coupling requirements
 parser.add_argument('-matd3', type=str2bool, help='Use_MATD3?', default=False)
 parser.add_argument('-maddpg', type=str2bool, help='Use_MADDPG?', default=False)
 parser.add_argument('-reward', type=str, help='Reward Structure? 1. mixed 2. global', default='global')
 parser.add_argument('-frames', type=float, help='Frames in millions?', default=20)
 parser.add_argument('-dpp', type=str2bool, help='Use DPP?', default=False)
-
-
+parser.add_argument('-action_space', type=str, help='different or same?', default='same') # todo: for different speeds of each agents
 
 parser.add_argument('-filter_c', type=int, help='Prob multiplier for evo experiences absorbtion into buffer?', default=1)
 parser.add_argument('-evals', type=int, help='#Evals to compute a fitness', default=1)
-parser.add_argument('-seed', type=int, help='#Seed', default=2019)
+parser.add_argument('-seed', type=int, help='#Seed', default=2018)
 parser.add_argument('-algo', type=str, help='SAC Vs. TD3?', default='TD3')
 parser.add_argument('-savetag', help='Saved tag', default='')
 parser.add_argument('-gradperstep', type=float, help='gradient steps per frame', default=0.1)
@@ -35,16 +32,25 @@ parser.add_argument('-pr', type=float, help='Prioritization?', default=0.0)
 parser.add_argument('-alz', type=str2bool, help='Actualize?', default=False)
 parser.add_argument('-scheme', type=str, help='Scheme?', default='standard')
 parser.add_argument('-cmd_vel', type=str2bool, help='Switch to Velocity commands?', default=True)
-parser.add_argument('-ps', type=str, help='Parameter Sharing Scheme: 1. none (heterogenous) 2. full (homogeneous) 3. trunk (shared trunk - similar to multi-headed)?', default='trunk')
+parser.add_argument('-ps', type=str, help='Parameter Sharing Scheme: 1. none (heterogenous) 2. full (homogeneous) 3. trunk (shared trunk - similar to multi-headed)?', default='none')
 
 RANDOM_BASELINE = False
 
-
+'''
+####################
+####################
+README:
+For heterogeneous: play with hyper parameters in CONFIG: "fire_truck_uav_long_range_lidar"
+####################
+####################
+'''
 
 class ConfigSettings:
 	def __init__(self, popnsize):
 
 		self.env_choice = vars(parser.parse_args())['env']
+		self.action_space = vars(parser.parse_args())['action_space']
+
 		config = vars(parser.parse_args())['config']
 		self.config = config
 		self.reward_scheme = vars(parser.parse_args())['reward']
@@ -68,13 +74,15 @@ class ConfigSettings:
 		self.cmd_vel = vars(parser.parse_args())['cmd_vel']
 
 		# ROVER DOMAIN
-		if self.env_choice == 'rover_loose' or self.env_choice == 'rover_tight' or self.env_choice == 'rover_trap':  # Rover Domain
+		if self.env_choice == 'rover_loose' or self.env_choice == 'rover_heterogeneous' or self.env_choice == 'rover_tight' or self.env_choice == 'rover_trap':  # Rover Domain
 
 
 			if config == 'two_test':
 				# Rover domain
 				self.dim_x = self.dim_y = 10
 				self.obs_radius = self.dim_x * 10
+
+
 				self.act_dist = 2
 				self.angle_res = 10
 				self.num_poi = 2
@@ -83,7 +91,7 @@ class ConfigSettings:
 				self.poi_rand = 1
 				self.coupling = 2
 				self.rover_speed = 1
-				self.sensor_model = 'closest'
+				self.sensor_model = 'closest' # takes the one closest to the POI
 
 			elif config == 'nav':
 				# Rover domain
@@ -99,52 +107,206 @@ class ConfigSettings:
 			##########LOOSE##########
 			elif config == '3_1':
 				# Rover domain
-				self.dim_x = self.dim_y = 30; self.obs_radius = self.dim_x * 10; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
+				self.dim_x = self.dim_y = 30;  self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
 				self.angle_res = 10
 				self.num_poi = 3
-				self.num_agents = 3
+				self.num_agent_types = 1  # heterogeneous agents types
+				self.num_agents_per_type = 3
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10 / (i + 1))
+
+				self.obs_radius = obs
+				self.obs_radius = obs
 				self.ep_len = 50
 				self.poi_rand = 1
 				self.coupling = 1
 
+				print("Configuration:", "Number of agents- ", self.num_agents, "Agents types- ", self.num_agent_types, "Number of POIs- ", self.num_poi)
+
+
 			##########TIGHT##########
-			elif config == '4_2':
+
+
+			elif config == 'fire_truck_uav':
 				# Rover domain
 				self.dim_x = self.dim_y = 20;
-				self.obs_radius = self.dim_x * 10;
+				#self.obs_radius = self.dim_x * 10;
 				self.act_dist = 3;
 				self.rover_speed = 1;
 				self.sensor_model = 'closest'
 				self.angle_res = 10
 				self.num_poi = 4
-				self.num_agents = 4
+
+				self.num_agent_types = 2  # todo: for firetruck and UAVs (type: 0 for UAV and type: 1 for firetruck)
+				self.num_agents_per_type = 4
+
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10/(i+1)) # fixme: change the observation radius to much lesser value
+
+				self.obs_radius = obs
 				self.ep_len = 50
 				self.poi_rand = 1
 				self.coupling = 2
 
-			elif config == '6_3':
+				print("Configuration:", "Number of agents- ", self.num_agents, "Agents types- ", self.num_agent_types, "Number of POIs- ", self.num_poi)
+
+
+			############ when we need 2 firertrucks with 1 UAV
+			elif config == 'fire_truck_uav_more': # needs one UAV and 2 rovers
 				# Rover domain
-				self.dim_x = self.dim_y = 20; self.obs_radius = self.dim_x * 10; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
+				self.dim_x = self.dim_y = 20;
+				#self.obs_radius = self.dim_x * 10;
+				self.act_dist = 3;
+				self.rover_speed = 1;
+				self.sensor_model = 'closest'
 				self.angle_res = 10
 				self.num_poi = 4
-				self.num_agents = 6
+
+				self.num_agent_types = 2  # todo: for firetruck and UAVs (ID: 0 for UAV and ID: 1 for firetruck)
+				self.num_agents_per_type = 4
+
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10/(i+1)) # fixme: change the observation radius to much lesser value
+
+				self.obs_radius = obs
+				self.ep_len = 50
+				self.poi_rand = 1
+				#self.coupling = 2
+
+				# self.coupling = 4
+				coupling_factor = [0 for _ in range(self.num_agent_types)]
+				coupling_factor[0] = 1
+				coupling_factor[1] = 2
+
+				self.coupling = coupling_factor
+
+				print("Configuration:", "Number of agents- ", self.num_agents, "Agents types- ", self.num_agent_types, "Number of POIs- ", self.num_poi)
+
+			######### Trying to simulate self driving cars which has various lidars, several cheap oneS with short range,
+			######### and then one long range lidar, which gets activated only when required
+			elif config == 'fire_truck_uav_long_range_lidar': # just one resolution angle has a long range, others are short
+				# Rover domain
+				self.dim_x = self.dim_y = 20;
+				#self.obs_radius = self.dim_x * 10;
+				self.act_dist = 3; # fixme: changed from 3
+				self.rover_speed = 1;
+				self.sensor_model = 'closest'
+				self.angle_res = 10# fixme: changed this
+				self.num_poi = 4
+
+				self.num_agent_types = 2  # for firetruck and UAVs (type: 0 for UAV and type: 1 for firetruck)
+				self.num_agents_per_type = 4
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				obs = []
+				percentage = 40  # fixme: added for comparison purpose, also need to change from 5 to 2
+
+				obs.append(2*self.dim_x) # for UAV
+				#obs.append(np.sqrt(2)*self.dim_x/2) # for fire truck
+				obs.append(np.sqrt((percentage / (100 * 3.14))) * self.dim_x)
+				#for i in range(self.num_agent_types):
+				#	obs.append(2*self.dim_x * 10/(i+1))
+
+				self.obs_radius = obs
+				#self.long_range = 2*self.dim_x
+				self.long_range = np.sqrt((percentage / (100 * 3.14))) * self.dim_x # fixme: currently no long range beam present, so this is same as obs of short beam
+				self.ep_len = 50
+				self.poi_rand = 1
+				#self.coupling = 2
+
+				coupling_factor = [0 for _ in range(self.num_agent_types)]
+				coupling_factor[0] = 1
+				coupling_factor[1] = 2
+
+				self.coupling = coupling_factor
+
+				print("Configuration:", "Number of agents- ", self.num_agents, "Agents types- ", self.num_agent_types, "Number of POIs- ", self.num_poi)
+
+			elif config == '4_2':
+				# Rover domain
+				self.dim_x = self.dim_y = 20;
+				#self.obs_radius = self.dim_x * 10;
+				self.act_dist = 3;
+				self.rover_speed = 1;
+				self.sensor_model = 'closest'
+				self.angle_res = 10
+				self.num_poi = 4
+
+				self.num_agent_types = 2  # todo: for more number of agents
+				self.num_agents_per_type = 2
+
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10/(i+1))
+
+				self.obs_radius = obs
+				self.ep_len = 50
+				self.poi_rand = 1
+				self.coupling = 2
+
+				print("Configuration:", "Number of agents- ", self.num_agents, "Agents types- ", self.num_agent_types, "Number of POIs- ", self.num_poi)
+
+
+			elif config == '6_3':
+				# Rover domain
+				self.dim_x = self.dim_y = 20; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
+				self.angle_res = 10
+				self.num_poi = 4
+
+
+				self.num_agent_types = 2  # todo: for more number of agents
+				self.num_agents_per_type = 3
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10 / (i + 1))
+
+				self.obs_radius = obs
+
 				self.ep_len = 50
 				self.poi_rand = 1
 				self.coupling = 3
+
+				print("Configuration:", "Number of agents- ", self.num_agents, "Agents types- ", self.num_agent_types, "Number of POIs- ", self.num_poi)
+
 
 			elif config == '8_4':
 				# Rover domain
 				self.dim_x = self.dim_y = 20; self.obs_radius = self.dim_x * 10; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
 				self.angle_res = 10
 				self.num_poi = 4
-				self.num_agents = 8
+
+
+				self.num_agent_types = 2  # todo: for more number of agents
+				self.num_agents_per_type = 4
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10 / (i + 1))
+
+				self.obs_radius = obs
+
 				self.ep_len = 50
 				self.poi_rand = 1
 				self.coupling = 4
 
 			elif config == '10_5':
 				# Rover domain
-				self.dim_x = self.dim_y = 20; self.obs_radius = self.dim_x * 10; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
+				self.dim_x = self.dim_y = 20;  self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
 				self.angle_res = 10
 				self.num_poi = 4
 				self.num_agents = 10
@@ -154,10 +316,22 @@ class ConfigSettings:
 
 			elif config == '12_6':
 				# Rover domain
-				self.dim_x = self.dim_y = 20; self.obs_radius = self.dim_x * 10; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
+				self.dim_x = self.dim_y = 20; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
 				self.angle_res = 10
 				self.num_poi = 4
-				self.num_agents = 12
+
+				self.num_agent_types = 2  # todo: for more number of agents
+				self.num_agents_per_type = 6
+
+				self.num_agents = self.num_agent_types * self.num_agents_per_type
+
+				obs = []
+				for i in range(self.num_agent_types):
+					obs.append(self.dim_x * 10 / (i + 1))
+
+				self.obs_radius = obs
+
+				self.ep_len = 50
 				self.ep_len = 50
 				self.poi_rand = 1
 				self.coupling = 6
@@ -185,13 +359,16 @@ class ConfigSettings:
 			if self.env_choice == "rover_loose": self.coupling = 1 #Definiton of a Loosely coupled domain
 
 
+
+		###### fixme: removed this following block
+		'''
 		elif self.env_choice == 'rover_heterogeneous':
 			pass
-
+		
 
 		else:
 			sys.exit('Unknown Environment Choice')
-
+		'''
 
 class Parameters:
 	def __init__(self):
@@ -201,7 +378,7 @@ class Parameters:
 		self.rollout_size = vars(parser.parse_args())['rollsize']
 		self.num_evals = vars(parser.parse_args())['evals']
 		self.frames_bound = int(vars(parser.parse_args())['frames'] * 1000000)
-		self.actualize = vars(parser.parse_args())['alz']
+		self.actualize = vars(parser.parse_args())['alz'] # todo: what is this?
 		self.priority_rate = vars(parser.parse_args())['pr']
 		self.use_gpu = torch.cuda.is_available()
 		self.seed = vars(parser.parse_args())['seed']
@@ -210,12 +387,13 @@ class Parameters:
 		self.is_maddpg = vars(parser.parse_args())['maddpg']
 		assert  self.is_maddpg * self.is_matd3 == 0 #Cannot be both True
 		self.use_dpp = vars(parser.parse_args())['dpp']  # 'multipoint' vs 'standard'
+		self.action_space = vars(parser.parse_args())['action_space'] # todo: change for same action space
 
 		# Env domain
 		self.config = ConfigSettings(self.popn_size)
 
 		# Fairly Stable Algo params
-		self.hidden_size = 100
+		self.hidden_size = 50 #fixme: changed from 100
 		self.algo_name = vars(parser.parse_args())['algo']
 		self.actor_lr = 5e-3
 		self.critic_lr = 1e-3
@@ -225,8 +403,9 @@ class Parameters:
 		self.gamma = 0.5 if self.popn_size > 0 else 0.97
 		self.batch_size = 512
 		self.buffer_size = 100000
+		#self.buffer_size = 10
 		self.filter_c = vars(parser.parse_args())['filter_c']
-		self.reward_scaling = 10.0
+		self.reward_scaling = 10.0 # TODO: why is this required?
 
 		self.action_loss = False
 		self.policy_ups_freq = 2
@@ -253,8 +432,8 @@ class Parameters:
 		self.num_blends = int(0.15 * self.popn_size)
 
 		# Dependents
-		if self.config.env_choice == 'rover_loose' or self.config.env_choice == 'rover_tight' or self.config.env_choice == 'rover_trap':  # Rover Domain
-			self.state_dim = int(720 / self.config.angle_res) + 1
+		if self.config.env_choice == 'rover_loose' or self.config.env_choice == 'rover_tight' or self.config.env_choice == 'rover_trap' or self.config.env_choice == 'rover_heterogeneous':  # Rover Domain
+			self.state_dim = int(360*(1+self.config.num_agent_types) / self.config.angle_res) + 1
 			if self.config.cmd_vel: self.state_dim += 2
 			self.action_dim = 2
 		elif self.config.env_choice == 'motivate':  # MultiWalker Domain
@@ -302,7 +481,8 @@ class Parameters:
 		               'pop' + str(self.popn_size) + \
 		               '_roll' + str(self.rollout_size) + \
 		               '_env' + str(self.config.env_choice) + '_' + str(self.config.config) + \
-					   '_seed' + str(self.seed) + \
+						'_action_' + str(self.action_space) + \
+			            '_seed' + str(self.seed) + \
 						'-reward' + str(self.config.reward_scheme) +\
 					   ('_alz' if self.actualize else '') + \
 		               ('_gsl' if self.config.is_gsl else '') + \
@@ -347,9 +527,9 @@ class MERL:
 
 		######### Initialize the Multiagent Team of agents ########
 		if self.args.ps == 'full' or self.args.ps == 'trunk':
-			self.agents = [Agent(self.args, id)]
+			self.agents = [Agent(self.args, id)] #todo: is it one agent or more>? is it just agent? sharing all parameters
 		elif self.args.ps == 'none':
-			self.agents = [Agent(self.args, id) for id in range(self.args.config.num_agents)]
+			self.agents = [Agent(self.args, id) for id in range(self.args.config.num_agents)] # neural network for each agent
 		else: sys.exit('Incorrect PS choice')
 		self.test_agent = TestAgent(self.args, 991)
 
@@ -357,18 +537,19 @@ class MERL:
 		if args.ps == "trunk": self.buffer_bucket = [buffer.tuples for buffer in self.agents[0].buffer]
 		else: self.buffer_bucket = [ag.buffer.tuples for ag in self.agents]
 
+		# Specifying 3 different networks for evo, PG and test rollouts
 		self.popn_bucket = [ag.popn for ag in self.agents]
 		self.rollout_bucket = [ag.rollout_actor for ag in self.agents]
 		self.test_bucket = self.test_agent.rollout_actor
 
 		######### EVOLUTIONARY WORKERS ############
 		if self.args.popn_size > 0:
-			self.evo_task_pipes = [Pipe() for _ in range(args.popn_size * args.num_evals)]
+			self.evo_task_pipes = [Pipe() for _ in range(args.popn_size * args.num_evals)] # evals for computing the fitness
 			self.evo_result_pipes = [Pipe() for _ in range(args.popn_size * args.num_evals)]
 			self.evo_workers = [Process(target=rollout_worker, args=(
 				self.args, i, 'evo', self.evo_task_pipes[i][1], self.evo_result_pipes[i][0],
 				self.buffer_bucket, self.popn_bucket, True, RANDOM_BASELINE)) for i in
-			                    range(args.popn_size * args.num_evals)]
+			                    range(args.popn_size * args.num_evals)] # rollout for pop_size*num_evals, # popn_bucket is the neural network for evo
 			for worker in self.evo_workers: worker.start()
 
 		######### POLICY GRADIENT WORKERS ############
@@ -378,7 +559,7 @@ class MERL:
 			self.pg_workers = [
 				Process(target=rollout_worker, args=(self.args, 0, 'pg', self.pg_task_pipes[1], self.pg_result_pipes[0],
 				                                     self.buffer_bucket, self.rollout_bucket,
-				                                     self.args.rollout_size > 0, RANDOM_BASELINE))]
+				                                     self.args.rollout_size > 0, RANDOM_BASELINE))] # rollout_bucket is the neural network for evo
 			for worker in self.pg_workers: worker.start()
 
 		######### TEST WORKERS ############
@@ -386,7 +567,7 @@ class MERL:
 		self.test_result_pipes = Pipe()
 		self.test_workers = [Process(target=rollout_worker,
 		                             args=(self.args, 0, 'test', self.test_task_pipes[1], self.test_result_pipes[0],
-		                                   None, self.test_bucket, False, RANDOM_BASELINE))]
+		                                   None, self.test_bucket, False, RANDOM_BASELINE))] # test_bucket is the neural network for evo
 		for worker in self.test_workers: worker.start()
 
 		#### STATS AND TRACKING WHICH ROLLOUT IS DONE ######
@@ -398,16 +579,16 @@ class MERL:
 	def make_teams(self, num_agents, popn_size, num_evals):
 
 		temp_inds = []
-		for _ in range(num_evals): temp_inds += list(range(popn_size))
+		for _ in range(num_evals): temp_inds += list(range(popn_size)) # this gives [0,1,2,3... (pop_size-1), 0,1,2,3.., (pop_size-1), for num_evals times]
 
-		all_inds = [temp_inds[:] for _ in range(num_agents)]
+		all_inds = [temp_inds[:] for _ in range(num_agents)] # repeating the above list for all agents [[0,1,2,3...], [0,1,2,3,...]..[]]
 		# for _ in range(num_evals):
 		# 	for ag in range(num_agents):
 		# 		all_inds[ag] += list(range(popn_size))
 
 		for entry in all_inds: random.shuffle(entry)
 
-		teams = [[entry[i] for entry in all_inds] for i in range(popn_size * num_evals)]
+		teams = [[entry[i] for entry in all_inds] for i in range(popn_size * num_evals)] # number of teams = pop_size * number of evals
 
 		return teams
 
@@ -424,29 +605,34 @@ class MERL:
 		# Test Rollout
 		if gen % self.args.test_gap == 0:
 			self.test_agent.make_champ_team(self.agents)  # Sync the champ policies into the TestAgent
-			self.test_task_pipes[0].send("START")
+			self.test_task_pipes[0].send("START") # sending START signal
 
 		# Figure out teams for Coevolution
+
 		if self.args.ps == 'full' or self.args.ps == 'trunk':
-			teams = [[i] for i in list(range(args.popn_size))]  # Homogeneous case is just the popn as a list of lists to maintain compatibility
+			teams = [[i] for i in list(range(args.popn_size))] # returns [[0], [1], [2]..] Homogeneous case is just the popn as a list of lists to maintain compatibility
 		else:
 			teams = self.make_teams(args.config.num_agents, args.popn_size, args.num_evals)  # Heterogeneous Case
+			# returns [[0,1,2,3..], [2,3,1,0...], ...] shuffled teams of agents, like 1st agent is from pop k, and so on....
+
+		#teams = self.make_teams(args.config.num_agents, args.popn_size, args.num_evals)  # Heterogeneous Case
 
 		########## START EVO ROLLOUT ##########
 		if self.args.popn_size > 0:
 			for pipe, team in zip(self.evo_task_pipes, teams):
-				pipe[0].send(team)
+				pipe[0].send(team)# sending team signal
 
 		########## START POLICY GRADIENT ROLLOUT ##########
 		if self.args.rollout_size > 0 and not RANDOM_BASELINE:
 			# Synch pg_actors to its corresponding rollout_bucket
-			for agent in self.agents: agent.update_rollout_actor()
+			for agent in self.agents: agent.update_rollout_actor() # agents denote different neural network
 
 			# Start rollouts using the rollout actors
 			self.pg_task_pipes[0].send('START')  # Index 0 for the Rollout bucket
 
 			############ POLICY GRADIENT UPDATES #########
 			# Spin up threads for each agent
+			# Only PG will update, evolutionary will evolve
 			threads = [threading.Thread(target=agent.update_parameters, args=()) for agent in self.agents]
 
 			# Start threads
@@ -458,21 +644,26 @@ class MERL:
 		all_fits = []
 		####### JOIN EVO ROLLOUTS ########
 		if self.args.popn_size > 0:
-			for pipe in self.evo_result_pipes:
+			for pipe in self.evo_result_pipes: # for each population
 				entry = pipe[1].recv()
-				team = entry[0];
-				fitness = entry[1][0];
+				team = entry[0]; # team members
+				fitness = entry[1][0]; # list of fitness values for each evaluation of each team
 				frames = entry[2]
 
+				# so here, we are keeping a track of agent's ID and from which pop it came from
+				# what average fitness each agent gets in each population, so it means agent corresponding to which population id gets
+				# what reward when teamed up with agents picked randomly from other population, so each agent will have fitness according
+				# to the length of the population
 				for agent_id, popn_id in enumerate(team): self.agents[agent_id].fitnesses[popn_id].append(
-					utils.list_mean(fitness))  ##Assign
+					utils.list_mean(fitness))  ##Assign average of all fitness values of each evaluation to agent in that particular team
+				#print("##########", fitness)
 				all_fits.append(utils.list_mean(fitness))
 				self.total_frames += frames
 
 		####### JOIN PG ROLLOUTS ########
 		pg_fits = []
 		if self.args.rollout_size > 0 and not RANDOM_BASELINE:
-			entry = self.pg_result_pipes[1].recv()
+			entry = self.pg_result_pipes[1].recv() # for all the PG rollouts (50 in this case), it will store different fitness value
 			pg_fits = entry[1][0]
 			self.total_frames += entry[2]
 
@@ -486,7 +677,7 @@ class MERL:
 
 		# Evolution Step
 		for agent in self.agents:
-			agent.evolve()
+			agent.evolve() # selection, mutation happens
 
 		#Save models periodically
 		if gen % 20 == 0:
