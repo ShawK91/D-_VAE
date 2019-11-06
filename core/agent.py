@@ -76,9 +76,9 @@ class Agent:
 
 		#Initalize buffer
 		if args.ps == 'trunk':
-			self.buffer = [Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c) for _ in range(args.config.num_agents)] # buffer is different for each agent
+			self.buffer = [Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c) for _ in range(args.config.num_agents)]
 		else:
-			self.buffer = Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c) # corresponding to individual agent
+			self.buffer = Buffer(args.buffer_size, buffer_gpu=False, filter_c=args.filter_c)
 
 		#Agent metrics
 		self.fitnesses = [[] for _ in range(args.popn_size)]
@@ -95,7 +95,7 @@ class Agent:
 
 		if self.args.ps == 'trunk':
 
-			for agent_id, buffer in enumerate(self.buffer):
+			for agent_id, buffer in enumerate(self.buffer): # for homogeneous, agent is same, so the 1 buffer has internal multiple buffers fpr each agent
 				if self.args.is_matd3 or self.args.is_maddpg: buffer = self.buffer[0] #Hardcoded Hack for MADDPG
 
 				buffer.referesh()
@@ -115,8 +115,8 @@ class Agent:
 					self.algo.update_parameters(s, ns, a, r, done, global_reward, agent_id, 1, **td3args)
 				buffer.pg_frames = 0
 
-		else:
-			self.buffer.referesh()
+		else: # For Heterogeneous agents, different agents are defined individually
+			self.buffer.referesh() # it will anyway update all the agent's weights individually
 			if self.buffer.__len__() < 10 * self.args.batch_size: return  ###BURN_IN_PERIOD
 			self.buffer.tensorify()
 
@@ -168,10 +168,10 @@ class Agent:
 		self.fitnesses = [[] for _ in range(self.args.popn_size)]
 
 	def update_rollout_actor(self):
-		for actor in self.rollout_actor:
+		for actor in self.rollout_actor: # rollout actor will Multithreaded (for homogeneous) or Multiple actors (for heterogeneous)
 			#print(self.rollout_actor)
-			self.algo.policy.cpu()
-			mod.hard_update(actor, self.algo.policy)
+			self.algo.policy.cpu() # todo: why CPU?
+			mod.hard_update(actor, self.algo.policy) # hard update: just copying weights from algo.policy to actor
 			if self.args.use_gpu: self.algo.policy.cuda()
 
 

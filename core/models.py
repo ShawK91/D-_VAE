@@ -29,7 +29,7 @@ class MultiHeadActor(nn.Module):
 		self.linear2 = nn.Linear(hidden_size, hidden_size)
 
 		#Heads
-		self.mean = nn.Linear(hidden_size, num_actions*num_heads)
+		self.mean = nn.Linear(hidden_size, num_actions*num_heads)# 1 neural network outputting actions of all agents
 		self.noise = torch.Tensor(num_actions*num_heads)
 
 		self.apply(weights_init_policy_fn)
@@ -48,7 +48,7 @@ class MultiHeadActor(nn.Module):
 
 
 		"""
-		#state = state.view(state.size(0), -1)
+
 		x = torch.tanh(self.linear1(state))
 		x = torch.tanh(self.linear2(x))
 		mean = torch.tanh(self.mean(x))
@@ -63,7 +63,6 @@ class MultiHeadActor(nn.Module):
 
 	def noisy_action(self, state, head=-1):
 
-		#state = state.view(state.size(0), -1)
 		x = torch.tanh(self.linear1(state))
 		x = torch.tanh(self.linear2(x))
 		mean = torch.tanh(self.mean(x))
