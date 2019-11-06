@@ -34,6 +34,23 @@ parser.add_argument('-scheme', type=str, help='Scheme?', default='standard')
 parser.add_argument('-cmd_vel', type=str2bool, help='Switch to Velocity commands?', default=True)
 parser.add_argument('-ps', type=str, help='Parameter Sharing Scheme: 1. none (heterogenous) 2. full (homogeneous) 3. trunk (shared trunk - similar to multi-headed)?', default='none')
 
+parser.add_argument('-local_reward_type', type=str, help='Use a, b, c, d', default='a')
+
+''' ################ Local shaped rewards ############# 
+'a' : local reward for truck: dist to closest POI
+    : local reward for UAV: dist to closest POI
+
+'b' : local reward for truck: dist to closest UAV
+	: local reward for UAV: dist to closest POI
+	
+'C' : local reward for truck: c1* dist to closest POI + c2* dist to closest UAV
+	: local reward for UAV: dist to closest POI
+
+'d' : local reward for truck: dist to closest UAV
+	: local reward for UAV: dist to closest truck to its closest POI
+
+'''
+
 RANDOM_BASELINE = False
 
 '''
@@ -50,6 +67,8 @@ class ConfigSettings:
 
 		self.env_choice = vars(parser.parse_args())['env']
 		self.action_space = vars(parser.parse_args())['action_space']
+		self.local_reward_type = vars(parser.parse_args())['local_reward_type']
+
 
 		config = vars(parser.parse_args())['config']
 		self.config = config
@@ -183,7 +202,7 @@ class ConfigSettings:
 
 				# self.coupling = 4
 				coupling_factor = [0 for _ in range(self.num_agent_types)]
-				coupling_factor[0] = 1
+				coupling_factor[0] = 0
 				coupling_factor[1] = 2
 
 				self.coupling = coupling_factor
@@ -205,7 +224,13 @@ class ConfigSettings:
 				self.num_agent_types = 2  # for firetruck and UAVs (type: 0 for UAV and type: 1 for firetruck)
 				self.num_agents_per_type = 4
 
-				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				self.num_uavs = 2 # the first ones are UAVs in their IDs
+				self.num_fire_trucks = 4 # the last ones are UAVs in their IDs
+
+
+				#self.num_agents = self.num_agent_types * self.num_agents_per_type
+				self.num_agents = self.num_uavs + self.num_fire_trucks
+
 				obs = []
 				percentage = 40  # fixme: added for comparison purpose, also need to change from 5 to 2
 
@@ -223,7 +248,7 @@ class ConfigSettings:
 				#self.coupling = 2
 
 				coupling_factor = [0 for _ in range(self.num_agent_types)]
-				coupling_factor[0] = 1
+				coupling_factor[0] = 0 # fixme: play around with this
 				coupling_factor[1] = 2
 
 				self.coupling = coupling_factor
@@ -387,7 +412,8 @@ class Parameters:
 		self.is_maddpg = vars(parser.parse_args())['maddpg']
 		assert  self.is_maddpg * self.is_matd3 == 0 #Cannot be both True
 		self.use_dpp = vars(parser.parse_args())['dpp']  # 'multipoint' vs 'standard'
-		self.action_space = vars(parser.parse_args())['action_space'] # todo: change for same action space
+		self.action_space = vars(parser.parse_args())['action_space']
+		self.local_reward_type = vars(parser.parse_args())['local_reward_type']
 
 		# Env domain
 		self.config = ConfigSettings(self.popn_size)

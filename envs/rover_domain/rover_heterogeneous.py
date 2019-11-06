@@ -34,6 +34,8 @@ class RoverDomainHeterogeneous:
 
 		#Local Reward computing methods
 		self.rover_closest_poi = [self.args.dim_x*2 for _ in range(self.args.num_agents)]
+		self.rover_closest_poi_id = [self.args.num_agents for _ in range(self.args.num_agents)]  # initialize to max
+
 		self.rover_closest_rover = [self.args.dim_x*2 for _ in range(self.args.num_agents)] #todo: for distance of UAVs from firetruck
 
 		self.cumulative_local = [0 for _ in range(self.args.num_agents)]
@@ -65,6 +67,12 @@ class RoverDomainHeterogeneous:
 		return self.get_joint_state()
 
 
+	def get_agent_type(self, rover_id):
+		if (rover_id < self.args.num_uavs):
+			return 0 # for UAV
+		else:
+			return 1 # for trucks
+
 	def step(self, joint_action):
 
 		#If done send back dummy trasnsition
@@ -84,9 +92,11 @@ class RoverDomainHeterogeneous:
 			multiplier = 1.0
 			# todo: different action space for both rovers and POIs
 			if self.args.action_space == "different":
-				rover_type = int(rover_id / self.args.num_agents_per_type)
+				rover_type = int(rover_id / self.args.num_uavs)
 				if rover_type == 0:  # uav
 					multiplier = 1.5
+				else:
+					multiplier = 1.0
 
 
 			magnitude = 0.5*(joint_action[rover_id][0]+1) # [-1,1] --> [0,1]
@@ -202,9 +212,12 @@ class RoverDomainHeterogeneous:
 			temp_rover_dist_list = [[] for _ in range(int(360 * self.args.num_agent_types/self.args.angle_res))]
 			#temp_rover_dist_list = [[] for _ in range(int(360 / (self.args.angle_res)))]
 
-			rover_type_ref = int(rover_id / self.args.num_agents_per_type)
+			rover_type_ref = self.get_agent_type(rover_id)
 			# Log all distance into brackets for POIs
+			poi_id = -1
 			for loc, status, value in zip(self.poi_pos, self.poi_status, self.poi_value):
+				poi_id = poi_id + 1 # increment the POI ID
+
 				if status == 0: continue #If accessed ignore
 
 				angle, dist = self.get_angle_dist(self_x, self_y, loc[0], loc[1])
@@ -240,18 +253,20 @@ class RoverDomainHeterogeneous:
 				temp_poi_dist_list[bracket].append((value/(dist*dist))) # this is for a rover (as rover can see the POI within its observability region)
 
 				#update closest POI for each rover info
-				if dist < self.rover_closest_poi[rover_id]: self.rover_closest_poi[rover_id] = dist
+				if dist < self.rover_closest_poi[rover_id]:
+					self.rover_closest_poi[rover_id] = dist
+					self.rover_closest_poi_id[rover_id] = poi_id # also keep a track of the POI closest to the rover
 
 			# Log all distance into brackets for other drones
 			for id, loc, in enumerate(self.rover_pos):
 				if id == rover_id: continue #Ignore self
 
 				angle, dist = self.get_angle_dist(self_x, self_y, loc[0], loc[1])
-				rover_type = int(id/self.args.num_agents_per_type) # todo: getting type from rover ID
+				rover_type = self.get_agent_type(id) # todo: getting type from rover ID
 				angle -= self_orient
 				if angle < 0: angle += 360
 
-				#### consider only those rovers which are inside the observation radius
+
 				## todo: this is added for long_range_lidar of truck
 				if self.args.config == 'fire_truck_uav_long_range_lidar':
 					try: bracket = int(angle / self.args.angle_res)
@@ -285,8 +300,6 @@ class RoverDomainHeterogeneous:
 
 
 				#update closest POI for each rover info #todo: added just for fire truck and UAV case
-
-				##### UAV keeps distance to closest trucks and trucks keeps distance to closest UAVs
 				if(rover_type_ref == 0 and rover_type != rover_type_ref): # UAV case, and distance of UAVs to trucks
 					if dist < self.rover_closest_rover[rover_id]: self.rover_closest_rover[rover_id] = dist
 
@@ -352,17 +365,35 @@ class RoverDomainHeterogeneous:
 		poi_visitors = [[[] for _ in range(self.args.num_agent_types)] for _ in range(self.args.num_poi)]
 		poi_visitor_dist = [[[] for _ in range(self.args.num_agent_types)] for _ in range(self.args.num_poi)]
 
+		poi_to_rover_distance_id = [[[] for _ in range(self.args.num_agent_types)] for _ in range(self.args.num_poi)]
+		poi_to_rover_distance = [[[] for _ in range(self.args.num_agent_types)] for _ in range(self.args.num_poi)]
+
 		# poi_visitors = np.zeros((self.args.num_poi, self.args.num_agent_types)) # fixme: changed [[] for _ in range(self.args.num_poi)]
 		# poi_visitor_dist = np.zeros((self.args.num_poi, self.args.num_agent_types)) # fixme: changed [[] for _ in range(self.args.num_poi)]
 
+
+		### fixme: this block added to keep track of all distances from each POI to each rover
+		for i, loc in enumerate(self.poi_pos): #For all POIs
+			for rover_id in range(self.args.num_agents): #For each rover (num_agents is the total number of agents)
+				agent_type = self.get_agent_type(rover_id) # for each of the rover, finding its type
+				x1 = loc[0] - self.rover_pos[rover_id][0]; y1 = loc[1] - self.rover_pos[rover_id][1]
+				dist = math.sqrt(x1 * x1 + y1 * y1)
+
+				if dist == 0: dist = 0.001
+
+				#### keeping track of of all agent's distance from POIs, not usually used but might be useful in reward shaping
+				poi_to_rover_distance_id[i][agent_type].append(rover_id)  # store all rover's distance
+				poi_to_rover_distance[i][agent_type].append(dist)
+		############ till here
 		for i, loc in enumerate(self.poi_pos): #For all POIs
 			if self.poi_status[i]== 0: # if it has been observed
 				continue #Ignore POIs that have been harvested already
 
 			for rover_id in range(self.args.num_agents): #For each rover (num_agents is the total number of agents)
-				agent_type = rover_id // self.args.num_agents_per_type # for each of the rover, finding its type
+				agent_type = self.get_agent_type(rover_id) # for each of the rover, finding its type
 				x1 = loc[0] - self.rover_pos[rover_id][0]; y1 = loc[1] - self.rover_pos[rover_id][1]
 				dist = math.sqrt(x1 * x1 + y1 * y1)
+
 				if dist <= self.args.act_dist:
 					poi_visitors[i][agent_type].append(rover_id) # need to preserve the rover's ID so as to alot the rewards to them
 					#poi_visitors[i,agent_type] += 1 # Add rover to POI's visitor list of a particular agent type
@@ -408,53 +439,84 @@ class RoverDomainHeterogeneous:
 			for i in range(self.args.num_agents):
 				#print("%%%%%%%%%", self.rover_closest_poi)
 
-				agent_type = int(i / self.args.num_agents_per_type)
+				agent_type = self.get_agent_type(i)
 
-				##### fixme: for both UAV and truck, local reward is being close to POI
-				'''
-				if (self.rover_closest_poi[i]  > self.args.obs_radius[agent_type]): # if the closest distance to POI is outside the obs radius, do nothing
-					continue
-				else:
-					proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # both UAVs and fire trucks needs to go to POI, although the coupling requirement does not need UAV to go to them
-				'''
 
-				
-				#### local reward for truck being close to UAV and for UAV being close to POI
-				if (agent_type == 1):  # truck
-					if (self.rover_closest_rover[i] > self.args.obs_radius[agent_type]): # if it is outside the obs radius
-						continue
-					else: # reward will be in according to distance from UAV
-						proxim_rew = self.args.act_dist / self.rover_closest_rover[i]
-				else:  # UAV
-					if (self.rover_closest_poi[i] > self.args.obs_radius[agent_type]):   # if it is outside the obs radius
-						continue
-					else: # reward will be in according to distance from POI as well as distance to UAV
-						proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # fixme: this self.args.act_dist should not be there
-
-				#### local reward for truck being close to UAV and also being close to closest POI and for UAV being close to POI
-				'''
-				if (agent_type == 1):  # truck
-					if (self.rover_closest_rover[i] > self.args.obs_radius[agent_type] and self.rover_closest_poi[i] > self.args.obs_radius[agent_type]): # if both are outside the obs radius
+				if (self.args.local_reward_type == 'a'): # local for both UAV and truck, local reward is being close to POI
+					if (self.rover_closest_poi[i]  > self.args.obs_radius[agent_type]): # if the closest distance to POI is outside the obs radius, do nothing
 						continue
 					else:
-						proxim_rew_uav = 0.0
-						proxim_rew_poi = 0.0
-						
-						if(self.rover_closest_rover[i] <= self.args.obs_radius[agent_type]): # if UAV is within obs radius
-							proxim_rew_uav = self.args.act_dist / self.rover_closest_rover[i]
-							
-						if (self.rover_closest_poi[i] <= self.args.obs_radius[agent_type]): # if POI is within obs radius
-							proxim_rew_poi = self.args.act_dist / self.rover_closest_poi[i]
-					
-					proxim_rew = 0.2*proxim_rew_uav + 0.8*proxim_rew_poi # change this 
-					
-				else:  # UAV
-					if (self.rover_closest_poi[i] > self.args.obs_radius[agent_type]):   # if it is outside the obs radius
-						continue
-					else: # reward will be in according to distance from POI as well as distance to UAV
-						proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # fixme: this self.args.act_dist should not be there
+						proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # both UAVs and fire trucks needs to go to POI, although the coupling requirement does not need UAV to go to them
 
-				'''
+
+				elif(self.args.local_reward_type == 'b'): #### local reward for truck being close to UAV and for UAV being close to POI
+
+					if (agent_type == 1):  # truck
+						if (self.rover_closest_rover[i] > self.args.obs_radius[agent_type]): # if it is outside the obs radius
+							continue
+						else: # reward will be in according to distance from UAV
+							proxim_rew = self.args.act_dist / self.rover_closest_rover[i]
+					else:  # UAV
+						if (self.rover_closest_poi[i] > self.args.obs_radius[agent_type]):   # if it is outside the obs radius
+							continue
+						else: # reward will be in according to distance from POI as well as distance to UAV
+							proxim_rew = self.args.act_dist / self.rover_closest_poi[i] # fixme: this self.args.act_dist should not be there
+
+
+
+				elif(self.args.local_reward_type == 'c'): #### local reward for truck being close to UAV and also being close to closest POI and for UAV being close to POI
+
+					if (agent_type == 1):  # truck
+						if (self.rover_closest_rover[i] > self.args.obs_radius[agent_type] and self.rover_closest_poi[i] >
+								self.args.obs_radius[agent_type]):  # if both are outside the obs radius
+							continue
+						else:
+							proxim_rew_uav = 0.0
+							proxim_rew_poi = 0.0
+
+							if (self.rover_closest_rover[i] <= self.args.obs_radius[
+								agent_type]):  # if UAV is within obs radius
+								proxim_rew_uav = self.args.act_dist / self.rover_closest_rover[i]
+
+							if (self.rover_closest_poi[i] <= self.args.obs_radius[
+								agent_type]):  # if POI is within obs radius
+								proxim_rew_poi = self.args.act_dist / self.rover_closest_poi[i]
+
+						proxim_rew = 0.8 * proxim_rew_uav + 0.2 * proxim_rew_poi  # change this
+
+					else:  # UAV
+						if (self.rover_closest_poi[i] > self.args.obs_radius[
+							agent_type]):  # if it is outside the obs radius
+							continue
+						else:  # reward will be in according to distance from POI as well as distance to UAV
+							proxim_rew = self.args.act_dist / self.rover_closest_poi[i]  # fixme: this self.args.act_dist should not be there
+
+
+
+
+				elif (self.args.local_reward_type == 'd'): #### local reward for truck being close to UAV (highly unaligned) and for UAV incentivize when a truck is near its closest POI
+
+					if (agent_type == 1):  # truck
+						if (self.rover_closest_rover[i]  > self.args.obs_radius[agent_type]): # if it is outside the obs radius
+							continue
+						else: # reward will be in according to distance from UAV
+							proxim_rew = self.args.act_dist / self.rover_closest_rover[i]
+					else:  # UAV
+						if (self.rover_closest_poi[i] > self.args.obs_radius[agent_type]):   # find the nearest POI to UAV
+							continue
+						else: # reward will be in accordance to distance of closest UAV to POI
+							poi_index = self.rover_closest_poi_id[i] # find POI ID of the closest POI to the UAV
+							#print(poi_to_rover_distance)
+
+							closest_truck_index = np.argmin(poi_to_rover_distance[poi_index][1]) # find the closest distance of truck from POI
+							closest_truck_dist = poi_to_rover_distance[poi_index][1][closest_truck_index] # find the closest distance of truck from POI
+							# need POI ID and then retrieve the agent from "poi_visitor_dist"
+							proxim_rew = self.args.act_dist / closest_truck_dist# fixme: this self.args.act_dist should not be there
+
+
+				else:
+					sys.exit('Incorrect reward type')
+
 
 
 				if proxim_rew > 1.0: proxim_rew = 1.0
@@ -463,6 +525,8 @@ class RoverDomainHeterogeneous:
 				self.cumulative_local[i] += proxim_rew
 
 		self.rover_closest_poi = [self.args.dim_x * 2 for _ in range(self.args.num_agents)] #Reset closest POI
+		self.rover_closest_poi_id = [self.args.num_agents for _ in range(self.args.num_agents)]  # initialize to max
+
 		self.rover_closest_rover = [self.args.dim_x * 2 for _ in range(self.args.num_agents)] #Reset closest rovers
 
 
