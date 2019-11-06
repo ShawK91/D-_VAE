@@ -112,7 +112,7 @@ class ConfigSettings:
 				# Rover domain
 				self.dim_x = self.dim_y = 20; #fixme: changed from 20 to 10
 				#self.obs_radius = self.dim_x * 10;
-				percentage = 20 # fixme: added for comparison purpose, also need to change from 5 to 2
+				percentage = 60 # fixme: added for comparison purpose, also need to change from 5 to 2
 
 				self.obs_radius = np.sqrt((percentage/(100*3.14)))*self.dim_x
 				self.act_dist = 3; # fixme: changed from 3 to 2
