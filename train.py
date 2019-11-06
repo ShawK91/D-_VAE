@@ -232,7 +232,7 @@ class ConfigSettings:
 				self.num_agents = self.num_uavs + self.num_fire_trucks
 
 				obs = []
-				percentage = 40  # fixme: added for comparison purpose, also need to change from 5 to 2
+				percentage = 60  # fixme: added for comparison purpose, also need to change from 5 to 2
 
 				obs.append(2*self.dim_x) # for UAV
 				#obs.append(np.sqrt(2)*self.dim_x/2) # for fire truck
