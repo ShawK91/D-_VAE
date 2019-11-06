@@ -92,21 +92,19 @@ def rollout_worker(args, id, type, task_pipe, result_pipe, data_bucket, models_b
 
             #if args.config.env_choice == 'motivate' and type == "test": print(['%.2f'%r for r in reward], global_reward)
 
-            try: next_state = utils.to_tensor(np.array(next_state))
-            except: print(" here is the problem with the next_state", next_state)
-
+            next_state = utils.to_tensor(np.array(next_state))
             if type == "test" and args.config.config == 'simple_spread':
                 env.render(0)
                 print(joint_action[:,0,:])
                 # print(joint_state[0])
 
             #Grab global reward as fitnesses
-            for i, grew in enumerate(global_reward): # for all evaluation, for rollout size for PG, and for num_eval for Evo part
+            for i, grew in enumerate(global_reward):
                 if grew != None:
                     fitness[i] = grew
 
                     #Reward Shaping
-                    if (args.config.env_choice == 'motivate' or args.config.env_choice == 'rover_loose' or args.config.env_choice == 'rover_tight' or args.config.env_choice == 'rover_heterogeneous') and type == "evo":
+                    if (args.config.env_choice == 'motivate' or args.config.env_choice == 'rover_loose' or args.config.env_choice == 'rover_tight') and type == "evo":
                         if args.config.is_gsl:  # Gloabl subsumes local?
                             fitness[i] += sum(env.universe[i].cumulative_local)
 
@@ -168,8 +166,8 @@ def rollout_worker(args, id, type, task_pipe, result_pipe, data_bucket, models_b
         #print(fitness)
 
         #Vizualization for test sets
-       # if type == "test" and (args.config.env_choice == 'rover_tight' or args.config.env_choice == 'rover_loose' or args.config.env_choice == 'motivate'or args.config.env_choice == 'rover_trap'or args.config.config == 'simple_spread'):
-            #env.render()
+        if type == "test" and (args.config.env_choice == 'rover_tight' or args.config.env_choice == 'rover_loose' or args.config.env_choice == 'motivate'or args.config.env_choice == 'rover_trap'or args.config.config == 'simple_spread'):
+            env.render()
             #viz_gen += 5
             #print('Test trajectory lens',[len(world.rover_path[0]) for world in env.universe])
             #print (type, id, 'Fit of rendered', ['%.2f'%f for f in fitness])
@@ -177,9 +175,6 @@ def rollout_worker(args, id, type, task_pipe, result_pipe, data_bucket, models_b
             # 	best_performant = fitness.index(max(fitness))
             # 	env.universe[best_performant].viz(save=True, fname=args.aux_save+str(viz_gen)+'_'+args.savetag)
 
-        # Vizualization for test sets
-        if type == "test" and (args.config.env_choice == 'rover_tight' or args.config.env_choice == 'rover_heterogeneous' or args.config.env_choice == 'rover_loose' or args.config.env_choice == 'motivate'or args.config.env_choice == 'rover_trap'or args.config.config == 'simple_spread'):
-            env.render()
 
         #Send back id, fitness, total length and shaped fitness using the result pipe
         result_pipe.send([teams_blueprint, [fitness], frame])

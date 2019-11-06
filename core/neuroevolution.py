@@ -58,7 +58,8 @@ class SSNE:
 		"""
 
 
-		total_choices = len(index_rank)
+		total_choices = len(index_rank) # total population size
+		print("ALL SIZES", total_choices, num_offsprings, tournament_size)
 		offsprings = []
 		for i in range(num_offsprings):
 			winner = np.min(np.random.randint(total_choices, size=tournament_size))
@@ -67,6 +68,9 @@ class SSNE:
 		offsprings = list(set(offsprings))  # Find unique offsprings
 		if len(offsprings) % 2 != 0:  # Number of offsprings should be even
 			offsprings.append(index_rank[winner])
+
+		print("OFFSPRINGS", offsprings)
+
 		return offsprings
 
 	def list_argsort(self, seq):
@@ -334,7 +338,8 @@ class SSNE:
 
 		#Convert the list of fitness values corresponding to each individual into a float [CCEA Reduction]
 		if isinstance(fitness_evals[0], list):
-			for i in range(len(fitness_evals)):
+
+			for i in range(len(fitness_evals)): # for each popultion for each individual
 				if self.ccea_reduction == "mean": fitness_evals[i] = sum(fitness_evals[i])/len(fitness_evals[i])
 				elif self.ccea_reduction == "leniency":fitness_evals[i] = max(fitness_evals[i])
 				elif self.ccea_reduction == "min": fitness_evals[i] = min(fitness_evals[i])
@@ -343,24 +348,28 @@ class SSNE:
 
 		#Append new fitness to lineage
 		lineage_scores = [] #Tracks the average lineage score fot the generation
-		for ind, fitness in zip(net_inds, fitness_evals):
-			self.lineage[ind].append(fitness)
+		for ind, fitness in zip(net_inds, fitness_evals): # net_index for each population, fitness is either the max or the avg
+			self.lineage[ind].append(fitness) # for each ppopulation team, we get the max, avg or whatever of fitness values
+
 			lineage_scores.append( 0.75 * sum(self.lineage[ind])/len(self.lineage[ind]) + 0.25 * fitness) #Current fitness is weighted higher than lineage info
 			if len(self.lineage[ind]) > self.lineage_depth: self.lineage[ind].pop(0) #Housekeeping
 
+		print(self.lineage)
 
 		# Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
 		index_rank = self.list_argsort(fitness_evals); index_rank.reverse()
-		elitist_index = index_rank[:self.num_elites]  # Elitist indexes safeguard
+		elitist_index = index_rank[:self.num_elites]  # Elitist indexes safeguard, first k (self.num_elites) elites
+		#print("1. ", elitist_index)
 
 		#Lineage rankings to elitists
 		lineage_rank = self.list_argsort(lineage_scores[:]); lineage_rank.reverse()
 		elitist_index = elitist_index + lineage_rank[:int(self.num_elites)]
+		#print("2. ", elitist_index)
 
 		#Take out copies in elitist indices
 		elitist_index = list(set(elitist_index))
 
-
+		#print("3. ", elitist_index)
 
 		#################### MULTI_POINT SEARCH WITH ANCHORS/PROBES/BLENDS AND EXPLICIT DIVERSITY-BASED SEPARATION
 		if self.scheme == 'multipoint':
@@ -454,8 +463,8 @@ class SSNE:
 			# Inheritance step (sync learners to population)
 			for policy in migration:
 				replacee = unselects.pop(0)
-				utils.hard_update(target=pop[replacee], source=policy)
-				# wwid = genealogy.asexual(int(policy.wwid.item()))
+				utils.hard_update(target=pop[replacee], source=policy) # copying the gradient learned policy to the weekest
+				# wwid = genealogy.asunselectsexual(int(policy.wwid.item()))
 				# pop[replacee].wwid[0] = wwid
 				self.lineage[replacee] = [sum(lineage_scores) / len(lineage_scores)]  # Initialize as average
 
@@ -465,7 +474,7 @@ class SSNE:
 				elif len(offsprings) >= 1: replacee = offsprings.pop(0)
 				else: continue
 				new_elitists.append(replacee)
-				utils.hard_update(target=pop[replacee], source=pop[i])
+				utils.hard_update(target=pop[replacee], source=pop[i]) # copying from pop to the weekest element
 				# wwid = genealogy.asexual(int(pop[i].wwid.item()))
 				# pop[replacee].wwid[0] = wwid
 				# genealogy.elite(wwid, gen)

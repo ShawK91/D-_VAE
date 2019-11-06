@@ -25,6 +25,7 @@ class RoverDomainVel:
 		self.poi_pos = [[None, None] for _ in range(self.args.num_poi)]  # FORMAT: [poi_id][x, y] coordinate
 		self.poi_status = [self.harvest_period for _ in range(self.args.num_poi)]  # FORMAT: [poi_id][status] --> [harvest_period --> 0 (observed)] is observed?
 		#self.poi_value = [float(i+1) for i in range(self.args.num_poi)]  # FORMAT: [poi_id][value]?
+		#self.poi_value = [float(i+1) for i in range(self.args.num_poi)]  # FORMAT: [poi_id][value]?
 		self.poi_value = [1.0 for _ in range(self.args.num_poi)]
 		self.poi_visitor_list = [[] for _ in range(self.args.num_poi)]  # FORMAT: [poi_id][visitors]?
 
@@ -187,7 +188,21 @@ class RoverDomainVel:
 				if status == 0: continue #If accessed ignore
 
 				angle, dist = self.get_angle_dist(self_x, self_y, loc[0], loc[1])
+
+				#fixme: added for comparison purpose
+				try:
+					bracket = int(angle / self.args.angle_res)
+				except:
+					bracket = 0
+
+				if bracket == 0: # as 0 is the longest range lidar in truck
+					if dist > self.args.long_range: continue  # Observability radius
+				else:
+					if dist > self.args.obs_radius: continue  # Observability radius
+
+				'''
 				if dist > self.args.obs_radius: continue #Observability radius
+				'''
 
 				angle -= self_orient
 				if angle < 0: angle += 360
@@ -211,7 +226,20 @@ class RoverDomainVel:
 				angle -= self_orient
 				if angle < 0: angle += 360
 
+				#fixme: the following is added for long range lidar beam
+				try:
+					bracket = int(angle / self.args.angle_res)
+				except:
+					bracket = 0
+
+				if bracket == 0 : # as 0 is the longest range lidar in truck
+					if dist > self.args.long_range: continue  # Observability radius
+				else:
+					if dist > self.args.obs_radius: continue  # Observability radius
+
+				'''
 				if dist > self.args.obs_radius: continue #Observability radius
+				'''
 
 				if dist == 0: dist = 0.001
 				try: bracket = int(angle / self.args.angle_res)
@@ -301,7 +329,10 @@ class RoverDomainVel:
 		#Proximity Rewards
 		if self.args.is_proxim_rew:
 			for i in range(self.args.num_agents):
-				proxim_rew = self.args.act_dist/self.rover_closest_poi[i]
+				if (self.rover_closest_poi[i] > self.args.obs_radius):  # if the closest distance to POI is outside the obs radius, do nothing
+					continue
+				else: proxim_rew = self.args.act_dist/self.rover_closest_poi[i]
+
 				if proxim_rew > 1.0: proxim_rew = 1.0
 				rewards[i] += proxim_rew
 				#print(self.rover_closest_poi[i], proxim_rew)
