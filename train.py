@@ -224,15 +224,15 @@ class ConfigSettings:
 				self.num_agent_types = 2  # for firetruck and UAVs (type: 0 for UAV and type: 1 for firetruck)
 				self.num_agents_per_type = 4
 
-				self.num_uavs = 2 # the first ones are UAVs in their IDs
-				self.num_fire_trucks = 4 # the last ones are UAVs in their IDs
+				self.num_uavs = 4 # the first ones are UAVs in their IDs
+				self.num_fire_trucks = 6 # the last ones are UAVs in their IDs
 
 
 				#self.num_agents = self.num_agent_types * self.num_agents_per_type
 				self.num_agents = self.num_uavs + self.num_fire_trucks
 
 				obs = []
-				percentage = 60  # fixme: added for comparison purpose, also need to change from 5 to 2
+				percentage = 20  # fixme: added for comparison purpose, also need to change from 5 to 2
 
 				obs.append(2*self.dim_x) # for UAV
 				#obs.append(np.sqrt(2)*self.dim_x/2) # for fire truck
@@ -249,7 +249,7 @@ class ConfigSettings:
 
 				coupling_factor = [0 for _ in range(self.num_agent_types)]
 				coupling_factor[0] = 0 # fixme: play around with this
-				coupling_factor[1] = 2
+				coupling_factor[1] = 3
 
 				self.coupling = coupling_factor
 
