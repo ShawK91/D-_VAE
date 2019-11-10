@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-popsize', type=int, help='#Evo Population size', default=10)
 parser.add_argument('-rollsize', type=int, help='#Rollout size for agents', default=50) # FIXME: 0 is for evolutionary
 parser.add_argument('-env', type=str, help='Env to test on?', default='rover_tight')
-parser.add_argument('-config', type=str, help='World Setting?', default='4_2')
+parser.add_argument('-config', type=str, help='World Setting?', default='6_3')
 parser.add_argument('-matd3', type=str2bool, help='Use_MATD3?', default=False)
 parser.add_argument('-maddpg', type=str2bool, help='Use_MADDPG?', default=False)
 parser.add_argument('-reward', type=str, help='Reward Structure? 1. mixed 2. global', default='global')
@@ -108,11 +108,11 @@ class ConfigSettings:
 				self.coupling = 1
 
 			##########TIGHT##########
-			elif config == '4_2':
+			elif config == '6_3':
 				# Rover domain
 				self.dim_x = self.dim_y = 20; #fixme: changed from 20 to 10
 				#self.obs_radius = self.dim_x * 10;
-				percentage = 60 # fixme: added for comparison purpose, also need to change from 5 to 2
+				percentage = 20 # fixme: added for comparison purpose, also need to change from 5 to 2
 
 				self.obs_radius = np.sqrt((percentage/(100*3.14)))*self.dim_x
 				self.act_dist = 3; # fixme: changed from 3 to 2
@@ -127,7 +127,7 @@ class ConfigSettings:
 				#self.long_range = 2 * self.dim_x # fixme: added for comparison purpose
 				self.long_range = np.sqrt((percentage / (100 * 3.14))) * self.dim_x
 
-			elif config == '6_3':
+			elif config == '4_2': #fixme: need to change this labelling, just temporary 
 				# Rover domain
 				self.dim_x = self.dim_y = 20; self.obs_radius = self.dim_x * 10; self.act_dist = 3; self.rover_speed = 1; self.sensor_model = 'closest'
 				self.angle_res = 10
