@@ -26,7 +26,7 @@ parser.add_argument('-dpp', type=str2bool, help='Use DPP?', default=False)
 
 parser.add_argument('-filter_c', type=int, help='Prob multiplier for evo experiences absorbtion into buffer?', default=1)
 parser.add_argument('-evals', type=int, help='#Evals to compute a fitness', default=1)
-parser.add_argument('-seed', type=int, help='#Seed', default=2019)
+parser.add_argument('-seed', type=int, help='#Seed', default=2018)
 parser.add_argument('-algo', type=str, help='SAC Vs. TD3?', default='TD3')
 parser.add_argument('-savetag', help='Saved tag', default='')
 parser.add_argument('-gradperstep', type=float, help='gradient steps per frame', default=0.1)
@@ -120,10 +120,10 @@ class ConfigSettings:
 				self.sensor_model = 'closest'
 				self.angle_res = 10 #fixme: changed from 10 to 90
 				self.num_poi = 4
-				self.num_agents = 4
+				self.num_agents = 6
 				self.ep_len = 50 # fixme: changed from 50 to 25
 				self.poi_rand = 1
-				self.coupling = 2
+				self.coupling = 3
 				#self.long_range = 2 * self.dim_x # fixme: added for comparison purpose
 				self.long_range = np.sqrt((percentage / (100 * 3.14))) * self.dim_x
 
