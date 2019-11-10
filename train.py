@@ -23,7 +23,7 @@ parser.add_argument('-action_space', type=str, help='different or same?', defaul
 
 parser.add_argument('-filter_c', type=int, help='Prob multiplier for evo experiences absorbtion into buffer?', default=1)
 parser.add_argument('-evals', type=int, help='#Evals to compute a fitness', default=1)
-parser.add_argument('-seed', type=int, help='#Seed', default=2018)
+parser.add_argument('-seed', type=int, help='#Seed', default=2019)
 parser.add_argument('-algo', type=str, help='SAC Vs. TD3?', default='TD3')
 parser.add_argument('-savetag', help='Saved tag', default='')
 parser.add_argument('-gradperstep', type=float, help='gradient steps per frame', default=0.1)
@@ -222,9 +222,9 @@ class ConfigSettings:
 				self.num_poi = 4
 
 				self.num_agent_types = 2  # for firetruck and UAVs (type: 0 for UAV and type: 1 for firetruck)
-				self.num_agents_per_type = 4
+				#self.num_agents_per_type = 4
 
-				self.num_uavs = 4 # the first ones are UAVs in their IDs
+				self.num_uavs = 4   # the first ones are UAVs in their IDs
 				self.num_fire_trucks = 6 # the last ones are UAVs in their IDs
 
 
@@ -232,7 +232,7 @@ class ConfigSettings:
 				self.num_agents = self.num_uavs + self.num_fire_trucks
 
 				obs = []
-				percentage = 20  # fixme: added for comparison purpose, also need to change from 5 to 2
+				percentage = 60  # fixme: added for comparison purpose, also need to change from 5 to 2
 
 				obs.append(2*self.dim_x) # for UAV
 				#obs.append(np.sqrt(2)*self.dim_x/2) # for fire truck

@@ -121,13 +121,28 @@ class RoverDomainHeterogeneous:
 			theta = self.rover_vel[rover_id][1] * 180 + self.rover_pos[rover_id][2]
 			if theta > 360: theta -= 360
 			elif theta < 0: theta += 360
-			                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  #self.rover_pos[rover_id][2] = theta
 
+			# self.rover_pos[rover_id][2] = theta
 			#Update position
 			x = self.rover_vel[rover_id][0] * math.cos(math.radians(theta))
 			y = self.rover_vel[rover_id][0] * math.sin(math.radians(theta))
 			self.rover_pos[rover_id][0] += x
 			self.rover_pos[rover_id][1] += y
+
+			'''
+			#keep the updated pos within constraints
+			if (self.rover_pos[rover_id][0] >= self.args.dim_x):
+				self.rover_pos[rover_id][0] = self.args.dim_x-1
+
+			if (self.rover_pos[rover_id][0] < 0):
+				self.rover_pos[rover_id][0] = 0.0
+
+			if (self.rover_pos[rover_id][1] >= self.args.dim_y):
+				self.rover_pos[rover_id][1] = self.args.dim_y-1
+
+			if (self.rover_pos[rover_id][1] < 0):
+				self.rover_pos[rover_id][1] = 0.0
+			'''
 
 			#Log
 			self.rover_path[rover_id].append((self.rover_pos[rover_id][0], self.rover_pos[rover_id][1], self.rover_pos[rover_id][2]))
