@@ -225,7 +225,7 @@ class ConfigSettings:
 				#self.num_agents_per_type = 4
 
 				self.num_uavs = 4   # the first ones are UAVs in their IDs
-				self.num_fire_trucks = 6 # the last ones are UAVs in their IDs
+				self.num_fire_trucks = 4 # the last ones are UAVs in their IDs
 
 
 				#self.num_agents = self.num_agent_types * self.num_agents_per_type
@@ -249,7 +249,7 @@ class ConfigSettings:
 
 				coupling_factor = [0 for _ in range(self.num_agent_types)]
 				coupling_factor[0] = 0 # fixme: play around with this
-				coupling_factor[1] = 3
+				coupling_factor[1] = 2
 
 				self.coupling = coupling_factor
 
