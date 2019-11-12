@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-popsize', type=int, help='#Evo Population size', default=10)
 parser.add_argument('-rollsize', type=int, help='#Rollout size for agents', default=50)
 parser.add_argument('-env', type=str, help='Env to test on?', default='rover_heterogeneous')
-parser.add_argument('-config', type=str, help='World Setting?', default='fire_truck_uav_long_range_lidar') # todo: change this for different coupling requirements
+parser.add_argument('-config', type=str, help='World Setting?', default='fire_truck_uav_more') # todo: change this for different coupling requirements
 parser.add_argument('-matd3', type=str2bool, help='Use_MATD3?', default=False)
 parser.add_argument('-maddpg', type=str2bool, help='Use_MADDPG?', default=False)
 parser.add_argument('-reward', type=str, help='Reward Structure? 1. mixed 2. global', default='global')
@@ -180,30 +180,41 @@ class ConfigSettings:
 				# Rover domain
 				self.dim_x = self.dim_y = 20;
 				#self.obs_radius = self.dim_x * 10;
-				self.act_dist = 3;
+				self.act_dist = 3; # fixme: changed from 3
 				self.rover_speed = 1;
 				self.sensor_model = 'closest'
-				self.angle_res = 10
+				self.angle_res = 10# fixme: changed this
 				self.num_poi = 4
 
-				self.num_agent_types = 2  # todo: for firetruck and UAVs (ID: 0 for UAV and ID: 1 for firetruck)
-				self.num_agents_per_type = 4
+				self.num_agent_types = 2  # for firetruck and UAVs (type: 0 for UAV and type: 1 for firetruck)
+				#self.num_agents_per_type = 4
+
+				self.num_uavs = 4   # the first ones are UAVs in their IDs
+				self.num_fire_trucks = 6 # the last ones are UAVs in their IDs
 
 
-				self.num_agents = self.num_agent_types * self.num_agents_per_type
+				#self.num_agents = self.num_agent_types * self.num_agents_per_type
+				self.num_agents = self.num_uavs + self.num_fire_trucks
+
 				obs = []
-				for i in range(self.num_agent_types):
-					obs.append(self.dim_x * 10/(i+1)) # fixme: change the observation radius to much lesser value
+				percentage = 20  # fixme: added for comparison purpose, also need to change from 5 to 2
+
+				obs.append(2*self.dim_x) # for UAV
+				#obs.append(np.sqrt(2)*self.dim_x/2) # for fire truck
+				obs.append(np.sqrt((percentage / (100 * 3.14))) * self.dim_x)
+				#for i in range(self.num_agent_types):
+				#	obs.append(2*self.dim_x * 10/(i+1))
 
 				self.obs_radius = obs
+				#self.long_range = 2*self.dim_x
+				self.long_range = np.sqrt((percentage / (100 * 3.14))) * self.dim_x # fixme: currently no long range beam present, so this is same as obs of short beam
 				self.ep_len = 50
 				self.poi_rand = 1
 				#self.coupling = 2
 
-				# self.coupling = 4
 				coupling_factor = [0 for _ in range(self.num_agent_types)]
-				coupling_factor[0] = 0
-				coupling_factor[1] = 2
+				coupling_factor[0] = 0 # fixme: play around with this
+				coupling_factor[1] = 3
 
 				self.coupling = coupling_factor
 
